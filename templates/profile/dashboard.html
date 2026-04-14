@@ -66,7 +66,10 @@
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-start">
-      <h6 class="text-muted mb-2"><i class="bi bi-chat-left-text"></i> Présentation</h6>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="text-muted mb-0"><i class="bi bi-chat-left-text"></i> Présentation</h6>
+      <a href="/profile/edit" class="btn btn-sm btn-outline-primary" title="Modifier la bio"><i class="bi bi-pencil"></i></a>
+    </div>
       <a href="/profile/edit" class="btn btn-sm btn-outline-primary ms-2" title="Modifier"><i class="bi bi-pencil"></i></a>
     </div>
     <p class="mb-0">{{ bio.texte }}</p>
@@ -82,7 +85,7 @@
 <div class="row g-4 mb-4">
   <div class="col-md-6">
     <div class="card shadow-sm h-100">
-      <div class="card-header fw-semibold"><i class="bi bi-patch-check text-warning"></i> Certifications</div>
+      <div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span><i class="bi bi-patch-check text-warning"></i> Certifications</span><a href="/certifications/new" class="btn btn-sm btn-outline-warning" title="Ajouter"><i class="bi bi-plus-lg"></i></a></div>
       <div class="card-body p-0">
         {% if certifications %}
         <ul class="list-group list-group-flush">
@@ -105,7 +108,7 @@
   </div>
   <div class="col-md-6">
     <div class="card shadow-sm h-100">
-      <div class="card-header fw-semibold"><i class="bi bi-mortarboard text-info"></i> Formations</div>
+      <div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span><i class="bi bi-mortarboard text-info"></i> Formations</span><a href="/formations/new" class="btn btn-sm btn-outline-info" title="Ajouter"><i class="bi bi-plus-lg"></i></a></div>
       <div class="card-body p-0">
         {% if formations %}
         <ul class="list-group list-group-flush">
@@ -129,7 +132,7 @@
 </div>
 
 <div class="card shadow-sm mb-4">
-  <div class="card-header fw-semibold"><i class="bi bi-briefcase text-success"></i> Expériences professionnelles</div>
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span><i class="bi bi-briefcase text-success"></i> Expériences professionnelles</span><a href="/experiences/new" class="btn btn-sm btn-outline-success" title="Ajouter"><i class="bi bi-plus-lg"></i></a></div>
   {% if experiences %}
   <div class="card-body p-0">
     <ul class="list-group list-group-flush">
