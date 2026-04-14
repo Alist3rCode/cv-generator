@@ -1,7 +1,9 @@
 /* CV Generator — styles complémentaires à Bootstrap */
 
+/* body ne force plus de couleur — Bootstrap dark mode gère ça via data-bs-theme */
 body {
-  background-color: #f8f9fa;
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
 }
 
 .navbar-brand {
@@ -21,7 +23,7 @@ main.container {
   font-weight: 500;
 }
 
-/* ── Cartes cliquables du dashboard ───────────────────── */
+/* ── Cartes cliquables du dashboard ───────────────── */
 .card-clickable {
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -30,16 +32,16 @@ main.container {
   display: block;
 }
 .card-clickable:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,.12) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.15) !important;
   color: inherit;
 }
 
-/* ── Donut de complétion ──────────────────────────────── */
+/* ── Donut de complétion ────────────────────── */
 .completion-wrapper {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: 130px;
+  height: 130px;
   margin: 0 auto;
 }
 .completion-wrapper canvas {
@@ -50,29 +52,28 @@ main.container {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 2rem;
+  font-size: 1.7rem;
   font-weight: 700;
-  color: #0d6efd;
+  color: var(--bs-primary);
   line-height: 1;
 }
 .completion-sublabel {
   position: absolute;
-  top: calc(50% + 1.4rem);
+  top: calc(50% + 1.2rem);
   left: 50%;
   transform: translateX(-50%);
-  font-size: .7rem;
-  color: #6c757d;
+  font-size: .65rem;
+  color: var(--bs-secondary-color);
   white-space: nowrap;
 }
 
-/* ── Onglets de langue (drapeaux) ─────────────────────── */
+/* ── Onglets de langue (drapeaux) ───────────────── */
 .lang-tabs {
   display: flex;
   gap: 6px;
   align-items: center;
   margin-bottom: 6px;
 }
-
 .lang-tab-btn {
   border: 2px solid transparent;
   border-radius: 6px;
@@ -88,47 +89,50 @@ main.container {
   display: block;
   border-radius: 2px;
 }
-.lang-tab-btn:hover {
-  opacity: 0.75;
-}
-
-/* Onglet actif */
+.lang-tab-btn:hover { opacity: 0.75; }
 .lang-tab-btn.active {
-  border-color: #0d6efd;
+  border-color: var(--bs-primary);
   opacity: 1;
-  background-color: #e7f1ff;
+  background-color: var(--bs-primary-bg-subtle);
 }
-
-/* Aucune donnée en BDD pour cette langue */
 .lang-tab-btn.lang-missing {
-  border-color: #dee2e6;
+  border-color: var(--bs-border-color);
   opacity: 0.4;
 }
-
-/* Données non sauvegardées (modifié en JS) */
 .lang-tab-btn.lang-unsaved {
   border-color: #ff4444 !important;
   opacity: 1 !important;
   animation: tab-pulse 1.2s infinite;
 }
 @keyframes tab-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); }
-  50%       { box-shadow: 0 0 0 5px rgba(255, 68, 68, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0.5); }
+  50%       { box-shadow: 0 0 0 5px rgba(255,68,68,0); }
 }
 
-/* ── Bouton sauvegarder dynamique ─────────────────────── */
-.btn-save {
-  transition: all 0.2s;
-}
+/* ── Bouton sauvegarder dynamique ──────────────── */
+.btn-save { transition: all 0.2s; }
 
 /* ── Description preview (liste expériences) ── */
 .exp-description-preview {
   font-size: .875rem;
-  color: #6c757d;
+  color: var(--bs-secondary-color);
   max-height: 80px;
   overflow: hidden;
   mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
 }
 .exp-description-preview p { margin-bottom: .25rem; }
-.exp-description-preview ul, .exp-description-preview ol { padding-left: 1.2rem; margin-bottom: .25rem; }
+.exp-description-preview ul,
+.exp-description-preview ol { padding-left: 1.2rem; margin-bottom: .25rem; }
+
+/* ── Dark mode : ajustements Quill ───────────── */
+[data-bs-theme="dark"] .ql-toolbar,
+[data-bs-theme="dark"] .ql-container {
+  border-color: var(--bs-border-color) !important;
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+[data-bs-theme="dark"] .ql-editor { color: var(--bs-body-color); }
+[data-bs-theme="dark"] .ql-toolbar button svg .ql-stroke { stroke: var(--bs-body-color); }
+[data-bs-theme="dark"] .ql-toolbar button svg .ql-fill  { fill:  var(--bs-body-color); }
+[data-bs-theme="dark"] .ql-picker-label { color: var(--bs-body-color); }

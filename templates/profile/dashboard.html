@@ -2,11 +2,45 @@
 {% block title %}Tableau de bord — CV Generator{% endblock %}
 
 {% block content %}
-<!-- En-tete : accueil + donut -->
-<div class="row align-items-center mb-4 g-3">
-  <div class="col-auto me-auto">
-    <h2 class="mb-1">Bonjour, {{ current_user.prenom }} {{ current_user.nom }} <i class="bi bi-hand-wave"></i></h2>
-    <div class="d-flex gap-2 flex-wrap mt-2">
+
+<!-- ====================================================
+     Barre du haut : 6 cartes (3x2) | donut + badges
+===================================================== -->
+<div class="row g-3 mb-5 align-items-stretch">
+
+  <!-- Colonne gauche : 6 cartes en grille 3x2 -->
+  <div class="col-lg-9">
+    <div class="row g-2 h-100">
+      {% set nav_cards = [
+        ("/profile/edit",     "bi-person-vcard",            "text-primary",   "border-primary",   "Profil & Bio",     "Présentation, contacts"),
+        ("/experiences/",     "bi-briefcase",               "text-success",   "border-success",   "Expériences",   "Missions, entreprises"),
+        ("/formations/",      "bi-mortarboard",             "text-info",      "border-info",      "Formations",       "Diplômes, cursus"),
+        ("/certifications/",  "bi-patch-check",             "text-warning",   "border-warning",   "Certifications",   "Certifications pro"),
+        ("/competences/",     "bi-stars",                   "text-secondary", "border-secondary", "Compétences",   "Hard & soft skills"),
+        ("/exports/",         "bi-file-earmark-arrow-down", "text-danger",    "border-danger",    "Exporter mon CV",  "DOCX ou PDF"),
+      ] %}
+      {% for href, icon, color, border, title, sub in nav_cards %}
+      <div class="col-4">
+        <a href="{{ href }}" class="card-clickable card h-100 {{ border }} shadow-sm text-decoration-none">
+          <div class="card-body text-center py-3 px-2">
+            <i class="bi {{ icon }} fs-2 {{ color }}"></i>
+            <div class="fw-semibold mt-1 small">{{ title }}</div>
+            <div class="text-muted" style="font-size:.72rem;">{{ sub }}</div>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Colonne droite : donut + badges de gamification -->
+  <div class="col-lg-3 d-flex flex-column align-items-center justify-content-center gap-3">
+    <div class="completion-wrapper">
+      <canvas id="completionChart" width="130" height="130"></canvas>
+      <div class="completion-label">{{ completion }}%</div>
+      <div class="completion-sublabel">complété</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
       {% set checks = [
         ("bio",        "bi-chat-left-text", "Bio"),
         ("experience", "bi-briefcase",      "Expérience"),
@@ -14,48 +48,20 @@
         ("competence", "bi-stars",          "Compétence"),
       ] %}
       {% for key, icon, label in checks %}
-      <span class="badge {% if criteria[key] %}bg-success{% else %}bg-light text-secondary border{% endif %} d-flex align-items-center gap-1">
+      <span class="badge {% if criteria[key] %}bg-success{% else %}bg-secondary opacity-50{% endif %} d-flex align-items-center gap-1">
         <i class="bi {{ icon }}"></i> {{ label }}
         {% if criteria[key] %}<i class="bi bi-check-lg"></i>{% endif %}
       </span>
       {% endfor %}
     </div>
   </div>
-  <div class="col-auto text-center">
-    <div class="completion-wrapper">
-      <canvas id="completionChart" width="130" height="130"></canvas>
-      <div class="completion-label">{{ completion }}%</div>
-      <div class="completion-sublabel">complété</div>
-    </div>
-  </div>
+
 </div>
 
-<!-- Navigation rapide -->
-<div class="row g-2 mb-5">
-  {% set nav_cards = [
-    ("/profile/edit",     "bi-person-vcard",            "text-primary",   "border-primary",   "Profil & Bio",     "Présentation, contacts"),
-    ("/experiences/",     "bi-briefcase",               "text-success",   "border-success",   "Expériences",   "Missions, entreprises"),
-    ("/formations/",      "bi-mortarboard",             "text-info",      "border-info",      "Formations",       "Diplômes, cursus"),
-    ("/certifications/",  "bi-patch-check",             "text-warning",   "border-warning",   "Certifications",   "Certifications pro"),
-    ("/competences/",     "bi-stars",                   "text-secondary", "border-secondary", "Compétences",   "Hard & soft skills"),
-    ("/exports/",         "bi-file-earmark-arrow-down", "text-danger",    "border-danger",    "Exporter mon CV",  "DOCX ou PDF"),
-  ] %}
-  {% for href, icon, color, border, title, sub in nav_cards %}
-  <div class="col-6 col-md-4 col-lg-2">
-    <a href="{{ href }}" class="card-clickable card h-100 {{ border }} shadow-sm text-decoration-none">
-      <div class="card-body text-center py-3 px-2">
-        <i class="bi {{ icon }} fs-2 {{ color }}"></i>
-        <div class="fw-semibold mt-1 small">{{ title }}</div>
-        <div class="text-muted" style="font-size:.75rem;">{{ sub }}</div>
-      </div>
-    </a>
-  </div>
-  {% endfor %}
-</div>
-
-<!-- Resume du CV -->
+<!-- ====================================================
+     Resume du CV
+===================================================== -->
 <h4 class="mb-3"><i class="bi bi-person-lines-fill"></i> Résumé du CV</h4>
-
 {% if bio %}
 <div class="card shadow-sm mb-4">
   <div class="card-body">
@@ -155,10 +161,13 @@
     data: {
       datasets: [{
         data: [completion, 100 - completion],
-        backgroundColor: [
-          completion === 100 ? '#198754' : '#0d6efd',
-          '#e9ecef'
-        ],
+        backgroundColor: (function() {
+          var style = getComputedStyle(document.documentElement);
+          return [
+            completion === 100 ? '#198754' : '#0d6efd',
+            style.getPropertyValue('--bs-secondary-bg').trim() || '#e9ecef'
+          ];
+        })(),
         borderWidth: 0,
       }]
     },
