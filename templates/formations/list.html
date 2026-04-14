@@ -24,7 +24,6 @@
         {{ f.date_debut.strftime('%m/%Y') }} →
         {% if f.date_fin %}{{ f.date_fin.strftime('%m/%Y') }}{% else %}En cours{% endif %}
       </small>
-      {% if f.description %}<p class="mt-2 mb-0 text-muted">{{ f.description }}</p>{% endif %}
     </div>
     <div class="d-flex flex-column gap-2 ms-3">
       <a href="/formations/{{ f.id }}/edit" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
