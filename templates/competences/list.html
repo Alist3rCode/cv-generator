@@ -36,9 +36,10 @@
         </div>
         <div class="d-flex gap-2">
           <a href="/competences/{{ c.id }}/edit" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
-          <form method="post" action="/competences/{{ c.id }}/delete" onsubmit="return confirm('Supprimer ?')">
-            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
-          </form>
+          <button type="button" class="btn btn-outline-danger btn-sm"
+                  onclick="confirmDelete('{{ c.id }}', '{{ c.nom | replace("'", "\\'") }}')">
+            <i class="bi bi-trash"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -70,13 +71,108 @@
         </div>
         <div class="d-flex gap-2">
           <a href="/competences/{{ c.id }}/edit" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
-          <form method="post" action="/competences/{{ c.id }}/delete" onsubmit="return confirm('Supprimer ?')">
-            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
-          </form>
+          <button type="button" class="btn btn-outline-danger btn-sm"
+                  onclick="confirmDelete('{{ c.id }}', '{{ c.nom | replace("'", "\\'") }}')">
+            <i class="bi bi-trash"></i>
+          </button>
         </div>
       </div>
     </div>
     {% endfor %}
   </div>
 </div>
+
+{# ── Modal de confirmation de suppression ────────────────────────────── #}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">
+          <i class="bi bi-exclamation-triangle-fill text-danger"></i> Supprimer la compétence
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <p id="deleteModalMsg"></p>
+        <div id="deleteModalUsages" style="display:none;">
+          <p class="text-warning fw-semibold mb-1">
+            <i class="bi bi-exclamation-circle"></i>
+            Cette compétence est utilisée dans les expériences suivantes :
+          </p>
+          <ul id="deleteModalUsageList" class="mb-0"></ul>
+          <p class="mt-2 text-muted small">Elle sera retirée automatiquement de ces expériences.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-danger" id="deleteModalConfirmBtn">
+          <i class="bi bi-trash"></i> Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var _deleteModal = null;
+var _deleteCid   = null;
+
+function confirmDelete(cid, nom) {
+  _deleteCid = cid;
+
+  // Récupérer les usages
+  fetch('/competences/' + cid + '/usage')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var exps = data.experiences || [];
+
+      document.getElementById('deleteModalMsg').textContent =
+        'Voulez-vous vraiment supprimer « ' + nom + ' » ?';
+
+      var usagesDiv  = document.getElementById('deleteModalUsages');
+      var usagesList = document.getElementById('deleteModalUsageList');
+      usagesList.innerHTML = '';
+
+      if (exps.length > 0) {
+        exps.forEach(function(exp) {
+          var li = document.createElement('li');
+          li.textContent = exp.titre_poste + ' — ' + exp.entreprise;
+          usagesList.appendChild(li);
+        });
+        usagesDiv.style.display = '';
+      } else {
+        usagesDiv.style.display = 'none';
+      }
+
+      if (!_deleteModal) {
+        _deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+      }
+      _deleteModal.show();
+    })
+    .catch(function() {
+      // En cas d'erreur réseau, fallback simple
+      if (confirm('Supprimer cette compétence ?')) {
+        _doDelete(cid);
+      }
+    });
+}
+
+document.getElementById('deleteModalConfirmBtn').addEventListener('click', function() {
+  if (_deleteModal) _deleteModal.hide();
+  if (_deleteCid) _doDelete(_deleteCid);
+});
+
+function _doDelete(cid) {
+  var fd = new FormData();
+  fetch('/competences/' + cid + '/delete', { method: 'POST', body: fd })
+    .then(function(r) {
+      if (r.ok || r.redirected) {
+        window.location.href = '/competences/';
+      } else {
+        alert('Erreur lors de la suppression.');
+      }
+    })
+    .catch(function() { alert('Erreur réseau lors de la suppression.'); });
+}
+</script>
 {% endblock %}

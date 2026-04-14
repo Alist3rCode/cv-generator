@@ -6,12 +6,12 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User, Competence, Language, SkillTypeEnum, SkillLevelEnum
+from models import User, Competence, Experience, Language, SkillTypeEnum, SkillLevelEnum
 from routers.auth import require_user
 
 router = APIRouter(prefix="/competences", tags=["competences"])
@@ -140,12 +140,58 @@ def update_competence(
     return RedirectResponse(url=f"/competences/{cid}/edit?language_id={language_id}", status_code=303)
 
 
+@router.get("/{cid}/usage")
+def get_competence_usage(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    """Retourne les expériences (dédupliquées par GID) qui utilisent cette compétence."""
+    source = db.query(Competence).filter(
+        Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
+    ).first()
+    if not source:
+        return JSONResponse({"experiences": []})
+
+    gid_str = str(source.gid)
+    all_exps = db.query(Experience).filter(Experience.user_id == current_user.id).all()
+
+    seen_exp_gids = set()
+    result = []
+    for exp in all_exps:
+        exp_gid = str(exp.gid)
+        if exp_gid in seen_exp_gids:
+            continue
+        hard = [str(g) for g in (exp.hard_skills or [])]
+        soft = [str(g) for g in (exp.soft_skills or [])]
+        if gid_str in hard or gid_str in soft:
+            seen_exp_gids.add(exp_gid)
+            result.append({
+                "id": str(exp.id),
+                "titre_poste": exp.titre_poste,
+                "entreprise": exp.entreprise,
+            })
+
+    return JSONResponse({"experiences": result})
+
+
 @router.post("/{cid}/delete")
 def delete_competence(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     source = db.query(Competence).filter(
         Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
     ).first()
     if source:
+        gid_str = str(source.gid)
+        # Retirer le GID de toutes les expériences qui le référencent
+        all_exps = db.query(Experience).filter(Experience.user_id == current_user.id).all()
+        for exp in all_exps:
+            changed = False
+            hard = [str(g) for g in (exp.hard_skills or [])]
+            soft = [str(g) for g in (exp.soft_skills or [])]
+            if gid_str in hard:
+                hard = [g for g in hard if g != gid_str]
+                exp.hard_skills = hard or None
+                changed = True
+            if gid_str in soft:
+                soft = [g for g in soft if g != gid_str]
+                exp.soft_skills = soft or None
+                changed = True
         db.query(Competence).filter(
             Competence.gid == source.gid, Competence.user_id == current_user.id
         ).delete()

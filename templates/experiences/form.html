@@ -85,6 +85,96 @@
       </div>
       {% endif %}
 
+      {# ── Skill Picker ────────────────────────────────────────────────── #}
+      <input type="hidden" name="hard_skills_json" id="hardSkillsJson"
+             value="{{ exp_hard_gids | tojson if exp_hard_gids else '[]' }}" />
+      <input type="hidden" name="soft_skills_json" id="softSkillsJson"
+             value="{{ exp_soft_gids | tojson if exp_soft_gids else '[]' }}" />
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Compétences associées</label>
+
+        <div class="row g-3 align-items-start">
+
+          {# Panneau gauche — compétences assignées #}
+          <div class="col-md-5">
+            <div class="card h-100">
+              <div class="card-header py-2 bg-primary bg-opacity-10">
+                <strong><i class="bi bi-check2-circle"></i> Compétences de cette expérience</strong>
+              </div>
+              <div class="card-body p-2">
+                <p class="small text-muted mb-1 fw-semibold">Hard Skills</p>
+                <div id="assignedHard" class="d-flex flex-wrap gap-1 mb-2 picker-zone" data-type="hard" data-side="assigned" style="min-height:40px;"></div>
+                <hr class="my-1">
+                <p class="small text-muted mb-1 fw-semibold">Soft Skills</p>
+                <div id="assignedSoft" class="d-flex flex-wrap gap-1 picker-zone" data-type="soft" data-side="assigned" style="min-height:40px;"></div>
+              </div>
+            </div>
+          </div>
+
+          {# Colonne flèches #}
+          <div class="col-md-2 d-flex flex-column align-items-center justify-content-center gap-2 pt-4">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnMoveToAssigned" title="Ajouter sélection">
+              <i class="bi bi-arrow-left"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnMoveToAvailable" title="Retirer sélection">
+              <i class="bi bi-arrow-right"></i>
+            </button>
+          </div>
+
+          {# Panneau droit — compétences disponibles #}
+          <div class="col-md-5">
+            <div class="card h-100">
+              <div class="card-header py-2 bg-secondary bg-opacity-10">
+                <strong><i class="bi bi-grid"></i> Compétences disponibles</strong>
+              </div>
+              <div class="card-body p-2">
+                <p class="small text-muted mb-1 fw-semibold">Hard Skills</p>
+                <div id="availableHard" class="d-flex flex-wrap gap-1 mb-2 picker-zone" data-type="hard" data-side="available" style="min-height:40px;"></div>
+                <hr class="my-1">
+                <p class="small text-muted mb-1 fw-semibold">Soft Skills</p>
+                <div id="availableSoft" class="d-flex flex-wrap gap-1 picker-zone" data-type="soft" data-side="available" style="min-height:40px;"></div>
+
+                {# Mini-formulaire inline #}
+                <hr class="my-2">
+                <button type="button" class="btn btn-outline-success btn-sm w-100" id="btnShowInlineForm">
+                  <i class="bi bi-plus-circle"></i> Ajouter une compétence
+                </button>
+                <div id="inlineForm" class="mt-2 p-2 border rounded bg-light" style="display:none;">
+                  <div class="mb-2">
+                    <input type="text" id="inlineNom" class="form-control form-control-sm" placeholder="Nom de la compétence" />
+                  </div>
+                  <div class="row g-1 mb-2">
+                    <div class="col-6">
+                      <select id="inlineType" class="form-select form-select-sm">
+                        <option value="hard">Hard skill</option>
+                        <option value="soft">Soft skill</option>
+                      </select>
+                    </div>
+                    <div class="col-6">
+                      <select id="inlineNiveau" class="form-select form-select-sm">
+                        <option value="1">1 — Débutant</option>
+                        <option value="2">2 — Intermédiaire</option>
+                        <option value="3">3 — Avancé</option>
+                        <option value="4">4 — Expert</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-sm" id="btnInlineSubmit">
+                      <i class="bi bi-check"></i> Créer et ajouter
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnInlineCancel">Annuler</button>
+                  </div>
+                  <div id="inlineError" class="text-danger small mt-1" style="display:none;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>{# /row #}
+      </div>{# /skill picker #}
+
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-save btn-outline-secondary" id="saveBtn">
           <i class="bi bi-save"></i> Enregistrer
@@ -98,7 +188,7 @@
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script>
 (function() {
-  // Quill rich text editor
+  // ── Quill rich text editor ───────────────────────────────────────────
   var quill = new Quill('#quill-editor', {
     theme: 'snow',
     placeholder: 'Décrivez vos missions, responsabilités...',
@@ -111,6 +201,7 @@
 
   form.addEventListener('submit', function() {
     descInput.value = quill.root.innerHTML;
+    syncHiddenInputs();
     window.__formDirty = false;
   });
 
@@ -175,6 +266,212 @@
   document.addEventListener('click', function(e) {
     if (!locList.contains(e.target) && e.target !== locInput) locList.style.display = 'none';
   });
+
+  // ── Skill Picker ─────────────────────────────────────────────────────
+
+  // Données initiales depuis Jinja
+  var ALL_HARD = {{ comps_hard | tojson }};
+  var ALL_SOFT = {{ comps_soft | tojson }};
+  var initHardGids = new Set({{ exp_hard_gids | tojson }});
+  var initSoftGids = new Set({{ exp_soft_gids | tojson }});
+
+  // État courant
+  var assignedHardGids = new Set(initHardGids);
+  var assignedSoftGids = new Set(initSoftGids);
+
+  // Référence aux skill data par GID
+  var skillByGid = {};
+  ALL_HARD.forEach(function(s) { skillByGid[s.gid] = s; });
+  ALL_SOFT.forEach(function(s) { skillByGid[s.gid] = s; });
+
+  var selectedGids = new Set(); // GIDs sélectionnés (clic simple)
+
+  function levelDots(niveau, type) {
+    var color = type === 'hard' ? 'primary' : 'success';
+    var dots = '';
+    for (var i = 1; i <= 4; i++) {
+      dots += '<i class="bi bi-circle' + (i <= niveau ? '-fill' : '') + ' text-' + color + ' small"></i>';
+    }
+    return dots;
+  }
+
+  function makeChip(skill, side) {
+    var chip = document.createElement('span');
+    chip.className = 'badge rounded-pill border picker-chip user-select-none';
+    chip.style.cursor = 'pointer';
+    chip.style.fontSize = '0.82rem';
+    chip.dataset.gid = skill.gid;
+    chip.dataset.side = side;
+    chip.innerHTML = '<span class="me-1">' + skill.nom + '</span>' + levelDots(skill.niveau, skill.type || 'hard');
+
+    // Couleur selon côté
+    if (side === 'assigned') {
+      chip.classList.add('bg-primary', 'text-white', 'border-primary');
+    } else {
+      chip.classList.add('bg-light', 'text-dark', 'border-secondary');
+    }
+
+    chip.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var gid = chip.dataset.gid;
+      var isSelected = selectedGids.has(gid);
+      if (isSelected) {
+        selectedGids.delete(gid);
+        chip.classList.remove('opacity-75', 'border-warning');
+        chip.style.outline = '';
+      } else {
+        selectedGids.add(gid);
+        chip.style.outline = '2px solid #ffc107';
+      }
+    });
+
+    // Double-clic = déplacer directement
+    chip.addEventListener('dblclick', function(e) {
+      e.stopPropagation();
+      var gid = chip.dataset.gid;
+      selectedGids.delete(gid);
+      if (side === 'available') {
+        moveToAssigned(gid);
+      } else {
+        moveToAvailable(gid);
+      }
+    });
+
+    return chip;
+  }
+
+  function renderPickerZone(zoneEl, skillList, assignedSet, side) {
+    zoneEl.innerHTML = '';
+    var type = zoneEl.dataset.type;
+    skillList.forEach(function(skill) {
+      var inAssigned = assignedSet.has(skill.gid);
+      if (side === 'assigned' && !inAssigned) return;
+      if (side === 'available' && inAssigned) return;
+      zoneEl.appendChild(makeChip(skill, side));
+    });
+    if (zoneEl.children.length === 0) {
+      var placeholder = document.createElement('span');
+      placeholder.className = 'text-muted small fst-italic';
+      placeholder.textContent = side === 'assigned' ? 'Aucune compétence assignée' : 'Aucune compétence disponible';
+      zoneEl.appendChild(placeholder);
+    }
+  }
+
+  function renderAll() {
+    renderPickerZone(document.getElementById('assignedHard'), ALL_HARD, assignedHardGids, 'assigned');
+    renderPickerZone(document.getElementById('assignedSoft'), ALL_SOFT, assignedSoftGids, 'assigned');
+    renderPickerZone(document.getElementById('availableHard'), ALL_HARD, assignedHardGids, 'available');
+    renderPickerZone(document.getElementById('availableSoft'), ALL_SOFT, assignedSoftGids, 'available');
+  }
+
+  function syncHiddenInputs() {
+    document.getElementById('hardSkillsJson').value = JSON.stringify(Array.from(assignedHardGids));
+    document.getElementById('softSkillsJson').value = JSON.stringify(Array.from(assignedSoftGids));
+  }
+
+  function moveToAssigned(gid) {
+    var skill = skillByGid[gid];
+    if (!skill) return;
+    if (skill.type === 'hard') assignedHardGids.add(gid);
+    else assignedSoftGids.add(gid);
+    renderAll();
+    syncHiddenInputs();
+  }
+
+  function moveToAvailable(gid) {
+    assignedHardGids.delete(gid);
+    assignedSoftGids.delete(gid);
+    renderAll();
+    syncHiddenInputs();
+  }
+
+  // Bouton → (retirer de assigné)
+  document.getElementById('btnMoveToAvailable').addEventListener('click', function() {
+    var toMove = Array.from(selectedGids);
+    selectedGids.clear();
+    toMove.forEach(function(gid) { moveToAvailable(gid); });
+  });
+
+  // Bouton ← (ajouter à assigné)
+  document.getElementById('btnMoveToAssigned').addEventListener('click', function() {
+    var toMove = Array.from(selectedGids);
+    selectedGids.clear();
+    toMove.forEach(function(gid) { moveToAssigned(gid); });
+  });
+
+  // Clic en dehors = désélectionner
+  document.addEventListener('click', function() { selectedGids.clear(); });
+
+  // ── Inline form ──────────────────────────────────────────────────────
+  var btnShow   = document.getElementById('btnShowInlineForm');
+  var inlineDiv = document.getElementById('inlineForm');
+  var btnCancel = document.getElementById('btnInlineCancel');
+  var btnCreate = document.getElementById('btnInlineSubmit');
+  var errDiv    = document.getElementById('inlineError');
+
+  // La langue courante depuis le champ caché
+  function getCurrentLangId() {
+    var el = form.querySelector('input[name="language_id"]');
+    return el ? el.value : '';
+  }
+
+  btnShow.addEventListener('click', function() {
+    inlineDiv.style.display = inlineDiv.style.display === 'none' ? '' : 'none';
+    errDiv.style.display = 'none';
+  });
+  btnCancel.addEventListener('click', function() {
+    inlineDiv.style.display = 'none';
+  });
+
+  btnCreate.addEventListener('click', function() {
+    var nom    = document.getElementById('inlineNom').value.trim();
+    var type   = document.getElementById('inlineType').value;
+    var niveau = document.getElementById('inlineNiveau').value;
+    var langId = getCurrentLangId();
+
+    if (!nom) { errDiv.textContent = 'Le nom est requis.'; errDiv.style.display = ''; return; }
+    errDiv.style.display = 'none';
+
+    var fd = new FormData();
+    fd.append('nom', nom);
+    fd.append('type', type);
+    fd.append('niveau', niveau);
+    fd.append('language_id', langId);
+
+    fetch('/experiences/competences/inline', { method: 'POST', body: fd })
+      .then(function(r) {
+        if (!r.ok) throw new Error('Erreur serveur ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        // Ajouter à la liste locale
+        data.niveau = parseInt(data.niveau, 10);
+        skillByGid[data.gid] = data;
+        if (data.type === 'hard') {
+          ALL_HARD.push(data);
+          ALL_HARD.sort(function(a,b) { return a.nom.localeCompare(b.nom); });
+          assignedHardGids.add(data.gid);
+        } else {
+          ALL_SOFT.push(data);
+          ALL_SOFT.sort(function(a,b) { return a.nom.localeCompare(b.nom); });
+          assignedSoftGids.add(data.gid);
+        }
+        renderAll();
+        syncHiddenInputs();
+        // Réinitialiser le formulaire inline
+        document.getElementById('inlineNom').value = '';
+        inlineDiv.style.display = 'none';
+      })
+      .catch(function(err) {
+        errDiv.textContent = 'Erreur : ' + err.message;
+        errDiv.style.display = '';
+      });
+  });
+
+  // ── Initialisation ───────────────────────────────────────────────────
+  renderAll();
+  syncHiddenInputs();
+
 })();
 </script>
 {{ unsaved_guard("mainForm") }}
