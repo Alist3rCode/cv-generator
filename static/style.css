@@ -162,3 +162,21 @@ main.container {
 /* Donut — couleur principale via CSS var pour JS */
 :root         { --chart-primary: #6366f1; }
 [data-bs-theme="dark"] { --chart-primary: #818cf8; }
+
+/* ── Boutons crayon dashboard (outline indigo visible) ── */
+.btn-outline-primary {
+  --bs-btn-color: #6366f1;
+  --bs-btn-border-color: #6366f1;
+  --bs-btn-hover-bg: #6366f1;
+  --bs-btn-hover-border-color: #6366f1;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: #4f46e5;
+  --bs-btn-active-border-color: #4f46e5;
+}
+[data-bs-theme="dark"] .btn-outline-primary {
+  --bs-btn-color: #818cf8;
+  --bs-btn-border-color: #818cf8;
+  --bs-btn-hover-bg: #818cf8;
+  --bs-btn-hover-color: #1e1b4b;
+  --bs-btn-active-bg: #6366f1;
+}
