@@ -52,13 +52,15 @@ def _seed_default_languages():
     ]
     db = SessionLocal()
     try:
-        for code, nom in default_langs:
-            if not db.query(Language).filter(Language.code == code).first():
-                db.add(Language(id=_uuid.uuid4(), code=code, nom=nom))
-        # Migration : renommer le code "en" -> "gb" si besoin
+        # Migration : renommer le code "en" -> "gb" d'abord (avant l'insert "gb")
         lang_en = db.query(Language).filter(Language.code == "en").first()
         if lang_en:
             lang_en.code = "gb"
+            db.flush()
+        # Puis insérer les langues manquantes
+        for code, nom in default_langs:
+            if not db.query(Language).filter(Language.code == code).first():
+                db.add(Language(id=_uuid.uuid4(), code=code, nom=nom))
         db.commit()
     finally:
         db.close()
