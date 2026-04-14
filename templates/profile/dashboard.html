@@ -162,18 +162,21 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
   const completion = {{ completion }};
-  new Chart(document.getElementById('completionChart'), {
+
+  function getChartColors() {
+    var style = getComputedStyle(document.documentElement);
+    return [
+      completion === 100 ? '#22c55e' : style.getPropertyValue('--chart-primary').trim(),
+      style.getPropertyValue('--bs-secondary-bg').trim() || '#e9ecef'
+    ];
+  }
+
+  var donutChart = new Chart(document.getElementById('completionChart'), {
     type: 'doughnut',
     data: {
       datasets: [{
         data: [completion, 100 - completion],
-        backgroundColor: (function() {
-          var style = getComputedStyle(document.documentElement);
-          return [
-            completion === 100 ? '#22c55e' : getComputedStyle(document.documentElement).getPropertyValue('--chart-primary').trim(),
-            style.getPropertyValue('--bs-secondary-bg').trim() || '#e9ecef'
-          ];
-        })(),
+        backgroundColor: getChartColors(),
         borderWidth: 0,
       }]
     },
@@ -183,5 +186,11 @@
       animation: { duration: 900, easing: 'easeOutQuart' },
     }
   });
+
+  // Mise a jour des couleurs quand le theme change
+  window.__onThemeChange = function() {
+    donutChart.data.datasets[0].backgroundColor = getChartColors();
+    donutChart.update('none'); // 'none' = sans animation pour un changement instantane
+  };
 </script>
 {% endblock %}

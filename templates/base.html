@@ -114,6 +114,7 @@
     if (label) label.innerHTML = dark
       ? '<i class="bi bi-sun"></i> Thème clair'
       : '<i class="bi bi-moon-stars"></i> Thème sombre';
+    if (typeof window.__onThemeChange === 'function') window.__onThemeChange(theme);
   }
 
   // Init depuis localStorage ou préférence système
