@@ -96,7 +96,7 @@ def _load_comps_for_user(db: Session, user_id, prefer_lang_code="fr"):
 
 @router.get("/", response_class=HTMLResponse)
 def list_experiences(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    all_exps  = db.query(Experience).filter(Experience.user_id == current_user.id).order_by(Experience.date_debut.desc()).all()
+    all_exps  = db.query(Experience).filter(Experience.user_id == current_user.id, Experience.deleted_at == None).order_by(Experience.date_debut.desc()).all()
     experiences = _dedup_by_gid(all_exps)
     if not experiences:
         return RedirectResponse(url="/experiences/new", status_code=302)
@@ -255,6 +255,34 @@ def update_experience(
 
     db.commit()
     return RedirectResponse(url=f"/experiences/{exp_id}/edit?language_id={language_id}", status_code=303)
+
+
+@router.post("/{exp_id}/soft-delete")
+def soft_delete_experience(exp_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    """Désactive l'expérience (soft delete) sans la supprimer de la BDD."""
+    from datetime import datetime as _dt
+    source = db.query(Experience).filter(
+        Experience.id == uuid.UUID(exp_id), Experience.user_id == current_user.id
+    ).first()
+    if source:
+        # Marquer toutes les traductions du même GID
+        db.query(Experience).filter(
+            Experience.gid == source.gid, Experience.user_id == current_user.id
+        ).update({"deleted_at": _dt.utcnow()})
+        db.commit()
+    return RedirectResponse(url="/experiences/", status_code=303)
+
+
+@router.post("/{exp_id}/restore")
+def restore_experience(exp_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    """Réactive une expérience désactivée."""
+    source = db.query(Experience).filter(Experience.id == uuid.UUID(exp_id)).first()
+    if source:
+        db.query(Experience).filter(
+            Experience.gid == source.gid, Experience.user_id == current_user.id
+        ).update({"deleted_at": None})
+        db.commit()
+    return RedirectResponse(url="/admin/trash", status_code=303)
 
 
 @router.post("/{exp_id}/delete")

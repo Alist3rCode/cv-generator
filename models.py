@@ -225,6 +225,7 @@ class Experience(TranslatableMixin, AuditMixin, Base):
     description     = Column(Text,        nullable=True)
     hard_skills     = Column(JSON,        nullable=True)   # ["gid-uuid-1", "gid-uuid-2", ...]
     soft_skills     = Column(JSON,        nullable=True)   # ["gid-uuid-3", ...]
+    deleted_at      = Column(DateTime,    nullable=True)   # NULL = actif
 
     # Relations
     user     = relationship("User",     back_populates="experiences", foreign_keys=[user_id])
@@ -246,6 +247,7 @@ class Formation(TranslatableMixin, AuditMixin, Base):
     date_debut     = Column(Date,        nullable=False)
     date_fin       = Column(Date,        nullable=True)
     description    = Column(Text,        nullable=True)
+    deleted_at     = Column(DateTime,    nullable=True)   # NULL = actif
 
     # Relations
     user     = relationship("User",     back_populates="formations", foreign_keys=[user_id])
@@ -265,6 +267,7 @@ class Certification(TranslatableMixin, AuditMixin, Base):
     organisme       = Column(String(200), nullable=False)
     date_obtention  = Column(Date,        nullable=False)
     date_fin        = Column(Date,        nullable=True)   # NULL = pas d'expiration
+    deleted_at      = Column(DateTime,    nullable=True)   # NULL = actif
 
     # Relations
     user     = relationship("User",     back_populates="certifications", foreign_keys=[user_id])

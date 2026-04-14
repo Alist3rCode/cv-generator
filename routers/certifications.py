@@ -36,7 +36,7 @@ def _dedup_by_gid(items):
 
 @router.get("/", response_class=HTMLResponse)
 def list_certifications(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    all_items = db.query(Certification).filter(Certification.user_id == current_user.id).order_by(Certification.date_obtention.desc()).all()
+    all_items = db.query(Certification).filter(Certification.user_id == current_user.id, Certification.deleted_at == None).order_by(Certification.date_obtention.desc()).all()
     certs     = _dedup_by_gid(all_items)
     if not certs:
         return RedirectResponse(url="/certifications/new", status_code=302)
@@ -144,6 +144,31 @@ def update_certification(
         ))
     db.commit()
     return RedirectResponse(url=f"/certifications/{cid}/edit?language_id={language_id}", status_code=303)
+
+
+@router.post("/{cid}/soft-delete")
+def soft_delete_certification(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    from datetime import datetime as _dt
+    source = db.query(Certification).filter(
+        Certification.id == uuid.UUID(cid), Certification.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Certification).filter(
+            Certification.gid == source.gid, Certification.user_id == current_user.id
+        ).update({"deleted_at": _dt.utcnow()})
+        db.commit()
+    return RedirectResponse(url="/certifications/", status_code=303)
+
+
+@router.post("/{cid}/restore")
+def restore_certification(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    source = db.query(Certification).filter(Certification.id == uuid.UUID(cid)).first()
+    if source:
+        db.query(Certification).filter(
+            Certification.gid == source.gid, Certification.user_id == current_user.id
+        ).update({"deleted_at": None})
+        db.commit()
+    return RedirectResponse(url="/admin/trash", status_code=303)
 
 
 @router.post("/{cid}/delete")

@@ -122,3 +122,37 @@ def delete_template(tid: str, db: Session = Depends(get_db), current_user: User 
         db.delete(t)
         db.commit()
     return RedirectResponse(url="/templates/", status_code=303)
+
+
+# ── Corbeille admin ────────────────────────────────────────────────────────────
+
+from models import Experience, Formation, Certification
+
+@router.get("/admin/trash", response_class=HTMLResponse)
+def admin_trash(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    """Liste tous les éléments soft-deleted de l'utilisateur (admin ou propriétaire)."""
+    def dedup(items):
+        seen, result = set(), []
+        for item in items:
+            if item.gid not in seen:
+                seen.add(item.gid)
+                result.append(item)
+        return result
+
+    experiences   = dedup(db.query(Experience).filter(
+        Experience.user_id == current_user.id, Experience.deleted_at != None
+    ).order_by(Experience.deleted_at.desc()).all())
+
+    formations    = dedup(db.query(Formation).filter(
+        Formation.user_id == current_user.id, Formation.deleted_at != None
+    ).order_by(Formation.deleted_at.desc()).all())
+
+    certifications = dedup(db.query(Certification).filter(
+        Certification.user_id == current_user.id, Certification.deleted_at != None
+    ).order_by(Certification.deleted_at.desc()).all())
+
+    return templates.TemplateResponse("admin/trash.html", {
+        "request": request, "current_user": current_user,
+        "experiences": experiences, "formations": formations,
+        "certifications": certifications,
+    })

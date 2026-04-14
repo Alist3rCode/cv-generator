@@ -36,7 +36,7 @@ def _dedup_by_gid(items):
 
 @router.get("/", response_class=HTMLResponse)
 def list_formations(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    all_items = db.query(Formation).filter(Formation.user_id == current_user.id).order_by(Formation.date_debut.desc()).all()
+    all_items = db.query(Formation).filter(Formation.user_id == current_user.id, Formation.deleted_at == None).order_by(Formation.date_debut.desc()).all()
     formations = _dedup_by_gid(all_items)
     if not formations:
         return RedirectResponse(url="/formations/new", status_code=302)
@@ -150,6 +150,31 @@ def update_formation(
         ))
     db.commit()
     return RedirectResponse(url=f"/formations/{fid}/edit?language_id={language_id}", status_code=303)
+
+
+@router.post("/{fid}/soft-delete")
+def soft_delete_formation(fid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    from datetime import datetime as _dt
+    source = db.query(Formation).filter(
+        Formation.id == uuid.UUID(fid), Formation.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Formation).filter(
+            Formation.gid == source.gid, Formation.user_id == current_user.id
+        ).update({"deleted_at": _dt.utcnow()})
+        db.commit()
+    return RedirectResponse(url="/formations/", status_code=303)
+
+
+@router.post("/{fid}/restore")
+def restore_formation(fid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    source = db.query(Formation).filter(Formation.id == uuid.UUID(fid)).first()
+    if source:
+        db.query(Formation).filter(
+            Formation.gid == source.gid, Formation.user_id == current_user.id
+        ).update({"deleted_at": None})
+        db.commit()
+    return RedirectResponse(url="/admin/trash", status_code=303)
 
 
 @router.post("/{fid}/delete")

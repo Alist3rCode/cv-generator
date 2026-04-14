@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Corbeille — CV Generator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3><i class="bi bi-trash"></i> Corbeille</h3>
+  <a href="/dashboard" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Retour</a>
+</div>
+
+{% if not experiences and not formations and not certifications %}
+<div class="alert alert-success"><i class="bi bi-check-circle"></i> La corbeille est vide.</div>
+{% endif %}
+
+{% if experiences %}
+<h5 class="mb-3"><i class="bi bi-briefcase text-success"></i> Expériences</h5>
+{% for exp in experiences %}
+<div class="card mb-2 shadow-sm border-danger border-opacity-25">
+  <div class="card-body d-flex justify-content-between align-items-center py-2">
+    <div>
+      <span class="fw-semibold">{{ exp.titre_poste }}</span>
+      <small class="text-muted ms-2">{{ exp.entreprise }}</small>
+      <small class="text-muted d-block">
+        Supprimé le {{ exp.deleted_at.strftime('%d/%m/%Y à %H:%M') }}
+      </small>
+    </div>
+    <form method="post" action="/experiences/{{ exp.id }}/restore">
+      <button type="submit" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-arrow-counterclockwise"></i> Réactiver
+      </button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if formations %}
+<h5 class="mb-3 mt-4"><i class="bi bi-mortarboard text-info"></i> Formations</h5>
+{% for f in formations %}
+<div class="card mb-2 shadow-sm border-danger border-opacity-25">
+  <div class="card-body d-flex justify-content-between align-items-center py-2">
+    <div>
+      <span class="fw-semibold">{{ f.diplome }}</span>
+      <small class="text-muted ms-2">{{ f.etablissement }}</small>
+      <small class="text-muted d-block">
+        Supprimé le {{ f.deleted_at.strftime('%d/%m/%Y à %H:%M') }}
+      </small>
+    </div>
+    <form method="post" action="/formations/{{ f.id }}/restore">
+      <button type="submit" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-arrow-counterclockwise"></i> Réactiver
+      </button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if certifications %}
+<h5 class="mb-3 mt-4"><i class="bi bi-patch-check text-warning"></i> Certifications</h5>
+{% for cert in certifications %}
+<div class="card mb-2 shadow-sm border-danger border-opacity-25">
+  <div class="card-body d-flex justify-content-between align-items-center py-2">
+    <div>
+      <span class="fw-semibold">{{ cert.titre }}</span>
+      <small class="text-muted ms-2">{{ cert.organisme }}</small>
+      <small class="text-muted d-block">
+        Supprimé le {{ cert.deleted_at.strftime('%d/%m/%Y à %H:%M') }}
+      </small>
+    </div>
+    <form method="post" action="/certifications/{{ cert.id }}/restore">
+      <button type="submit" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-arrow-counterclockwise"></i> Réactiver
+      </button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

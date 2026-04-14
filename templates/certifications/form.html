@@ -84,5 +84,35 @@
   inputs.forEach(el => el.addEventListener('input', checkChanges));
 })();
 </script>
+
+{# Bouton supprimer + modale (uniquement en mode édition) #}
+{% if source_id %}
+<div class="d-flex justify-content-end mt-3">
+  <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal">
+    <i class="bi bi-trash"></i> Supprimer
+  </button>
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger" id="deleteModalLabel"><i class="bi bi-exclamation-triangle"></i> Confirmer la suppression</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Cet élément sera <strong>désactivé</strong> et n'apparaîtra plus dans votre CV ni sur le dashboard.</p>
+        <p class="text-muted small mb-0">Un administrateur peut le réactiver depuis la page <em>Corbeille</em> si nécessaire.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <form method="post" action="/certifications/{{ source_id }}/soft-delete" class="d-inline">
+          <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Confirmer la suppression</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {{ unsaved_guard("mainForm") }}
 {% endblock %}
