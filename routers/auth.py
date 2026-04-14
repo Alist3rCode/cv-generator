@@ -2,6 +2,7 @@
 routers/auth.py — Authentification (login / logout)
 """
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Form
@@ -49,9 +50,9 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User | 
         user_id: str = payload.get("sub")
         if user_id is None:
             return None
+        return db.query(User).filter(User.id == uuid.UUID(user_id)).first()
     except Exception:
         return None
-    return db.query(User).filter(User.id == user_id).first()
 
 
 def require_user(request: Request, db: Session = Depends(get_db)) -> User:
