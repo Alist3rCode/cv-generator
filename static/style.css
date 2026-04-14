@@ -17,12 +17,106 @@ main.container {
   max-width: 1100px;
 }
 
-/* Formulaires */
 .form-label {
   font-weight: 500;
 }
 
-/* Badges de niveau */
-.bi-circle-fill, .bi-circle {
-  font-size: 0.75rem;
+/* ── Cartes cliquables du dashboard ───────────────────── */
+.card-clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.card-clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12) !important;
+  color: inherit;
+}
+
+/* ── Donut de complétion ──────────────────────────────── */
+.completion-wrapper {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  margin: 0 auto;
+}
+.completion-wrapper canvas {
+  position: absolute;
+  top: 0; left: 0;
+}
+.completion-label {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0d6efd;
+  line-height: 1;
+}
+.completion-sublabel {
+  position: absolute;
+  top: calc(50% + 1.4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .7rem;
+  color: #6c757d;
+  white-space: nowrap;
+}
+
+/* ── Onglets de langue (drapeaux) ─────────────────────── */
+.lang-tabs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.lang-tab-btn {
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 3px 5px;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: all 0.2s;
+  background: none;
+  text-decoration: none;
+  line-height: 1;
+}
+.lang-tab-btn img {
+  display: block;
+  border-radius: 2px;
+}
+.lang-tab-btn:hover {
+  opacity: 0.75;
+}
+
+/* Onglet actif */
+.lang-tab-btn.active {
+  border-color: #0d6efd;
+  opacity: 1;
+  background-color: #e7f1ff;
+}
+
+/* Aucune donnée en BDD pour cette langue */
+.lang-tab-btn.lang-missing {
+  border-color: #dee2e6;
+  opacity: 0.4;
+}
+
+/* Données non sauvegardées (modifié en JS) */
+.lang-tab-btn.lang-unsaved {
+  border-color: #ff4444 !important;
+  opacity: 1 !important;
+  animation: tab-pulse 1.2s infinite;
+}
+@keyframes tab-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); }
+  50%       { box-shadow: 0 0 0 5px rgba(255, 68, 68, 0); }
+}
+
+/* ── Bouton sauvegarder dynamique ─────────────────────── */
+.btn-save {
+  transition: all 0.2s;
 }

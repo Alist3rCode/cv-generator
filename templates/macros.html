@@ -1,0 +1,22 @@
+{% macro lang_tabs(languages, active_language_id, translations_by_lang, base_url) %}
+{#
+  Affiche les onglets de langue avec drapeaux.
+  - languages         : liste de tous les objets Language
+  - active_language_id: str(UUID) de la langue active
+  - translations_by_lang: dict {str(lang_id): objet_traduit} — vide si "new"
+  - base_url          : URL de base pour les liens (ex: "/experiences/abc/edit")
+#}
+<div class="lang-tabs">
+  {% for lang in languages %}
+    {% set lang_id_str = lang.id | string %}
+    {% set has_data = lang_id_str in translations_by_lang %}
+    {% set is_active = lang_id_str == active_language_id %}
+    <a href="{{ base_url }}?language_id={{ lang.id }}"
+       class="lang-tab-btn {% if is_active %}active{% endif %} {% if not has_data and not is_active %}lang-missing{% endif %}"
+       title="{{ lang.nom }}"
+       data-lang-id="{{ lang.id }}">
+      <img src="https://flagcdn.com/24x18/{{ lang.code }}.png" alt="{{ lang.nom }}" width="24" height="18" />
+    </a>
+  {% endfor %}
+</div>
+{% endmacro %}

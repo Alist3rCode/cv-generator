@@ -1,42 +1,85 @@
 """
-routers/profile.py — Dashboard + formulaire de profil complet
+routers/profile.py — Dashboard + formulaire de profil complet (avec bio multi-langue)
 """
 
 import uuid
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from database import get_db
-from models import User, Profile, Language
+from models import User, Profile, Language, Bio, Experience, Formation, Competence
 from routers.auth import require_user
 
 router = APIRouter(tags=["profile"])
 templates = Jinja2Templates(directory="templates")
 
 
+def compute_completion(user_id, db: Session) -> tuple[int, dict]:
+    """Calcule le % de complétion du profil (4 critères = 25% chacun)."""
+    criteria = {
+        "bio":        db.query(Bio).filter(Bio.user_id == user_id).count() > 0,
+        "experience": db.query(Experience).filter(Experience.user_id == user_id).count() > 0,
+        "formation":  db.query(Formation).filter(Formation.user_id == user_id).count() > 0,
+        "competence": db.query(Competence).filter(Competence.user_id == user_id).count() > 0,
+    }
+    completed = sum(1 for v in criteria.values() if v)
+    return int(completed / len(criteria) * 100), criteria
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    completion, criteria = compute_completion(current_user.id, db)
     return templates.TemplateResponse("profile/dashboard.html", {
-        "request": request,
+        "request":     request,
         "current_user": current_user,
-        "profile": profile,
+        "completion":  completion,
+        "criteria":    criteria,
     })
 
 
 @router.get("/profile/edit", response_class=HTMLResponse)
-def edit_profile_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    profile  = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+def edit_profile_page(
+    request: Request,
+    language_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    profile   = db.query(Profile).filter(Profile.user_id == current_user.id).first()
     languages = db.query(Language).all()
+
+    # Langue active
+    active_language = languages[0] if languages else None
+    if language_id:
+        found = db.query(Language).filter(Language.id == uuid.UUID(language_id)).first()
+        if found:
+            active_language = found
+
+    # Bio pour la langue active
+    bio = None
+    if active_language:
+        bio = db.query(Bio).filter(
+            Bio.user_id == current_user.id,
+            Bio.language_id == active_language.id,
+        ).first()
+
+    # Quelles langues ont déjà une bio sauvegardée (dict pour la macro lang_tabs)
+    bios_by_lang = {
+        str(b.language_id): b
+        for b in db.query(Bio).filter(Bio.user_id == current_user.id).all()
+    }
+
     return templates.TemplateResponse("profile/edit.html", {
-        "request": request,
-        "current_user": current_user,
-        "profile": profile,
-        "languages": languages,
+        "request":         request,
+        "current_user":    current_user,
+        "profile":         profile,
+        "languages":       languages,
+        "active_language": active_language,
+        "bio":             bio,
+        "bios_by_lang":    bios_by_lang,
     })
 
 
@@ -45,9 +88,12 @@ def edit_profile(
     request: Request,
     telephone: Optional[str]    = Form(None),
     linkedin_url: Optional[str] = Form(None),
+    bio_texte: Optional[str]    = Form(None),
+    language_id: Optional[str]  = Form(None),
     db: Session                 = Depends(get_db),
     current_user: User          = Depends(require_user),
 ):
+    # Sauvegarder le profil (téléphone, LinkedIn)
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
     if profile:
         profile.telephone    = telephone or None
@@ -60,5 +106,25 @@ def edit_profile(
             linkedin_url=linkedin_url or None,
         )
         db.add(profile)
+
+    # Sauvegarder la bio pour la langue active
+    if bio_texte is not None and language_id:
+        lang_uuid = uuid.UUID(language_id)
+        bio = db.query(Bio).filter(
+            Bio.user_id == current_user.id,
+            Bio.language_id == lang_uuid,
+        ).first()
+        if bio:
+            bio.texte = bio_texte
+        elif bio_texte.strip():
+            bio = Bio(
+                id=uuid.uuid4(),
+                user_id=current_user.id,
+                language_id=lang_uuid,
+                texte=bio_texte,
+            )
+            db.add(bio)
+
     db.commit()
-    return RedirectResponse(url="/dashboard", status_code=303)
+    redirect_lang = f"?language_id={language_id}" if language_id else ""
+    return RedirectResponse(url=f"/profile/edit{redirect_lang}", status_code=303)

@@ -1,11 +1,11 @@
 """
-routers/competences.py — CRUD compétences (hard & soft skills)
+routers/competences.py — CRUD compétences (multi-langue via GID)
 """
 
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -18,17 +18,28 @@ router = APIRouter(prefix="/competences", tags=["competences"])
 templates = Jinja2Templates(directory="templates")
 
 
+def _dedup_by_gid(items):
+    seen, result = set(), []
+    for item in items:
+        if item.gid not in seen:
+            seen.add(item.gid)
+            result.append(item)
+    return result
+
+
 @router.get("/", response_class=HTMLResponse)
 def list_competences(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    competences = db.query(Competence).filter(Competence.user_id == current_user.id).order_by(Competence.type, Competence.nom).all()
+    all_items   = db.query(Competence).filter(Competence.user_id == current_user.id).order_by(Competence.type, Competence.nom).all()
+    competences = _dedup_by_gid(all_items)
     languages   = db.query(Language).all()
+    langs_by_gid = {}
+    for c in all_items:
+        langs_by_gid.setdefault(str(c.gid), set()).add(str(c.language_id))
     return templates.TemplateResponse("competences/list.html", {
-        "request": request,
-        "current_user": current_user,
-        "competences": competences,
-        "languages": languages,
-        "skill_types": SkillTypeEnum,
-        "skill_levels": SkillLevelEnum,
+        "request": request, "current_user": current_user,
+        "competences": competences, "languages": languages,
+        "langs_by_gid": langs_by_gid,
+        "skill_types": SkillTypeEnum, "skill_levels": SkillLevelEnum,
     })
 
 
@@ -36,12 +47,11 @@ def list_competences(request: Request, db: Session = Depends(get_db), current_us
 def new_competence_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     languages = db.query(Language).all()
     return templates.TemplateResponse("competences/form.html", {
-        "request": request,
-        "current_user": current_user,
-        "languages": languages,
-        "comp": None,
-        "skill_types": SkillTypeEnum,
-        "skill_levels": SkillLevelEnum,
+        "request": request, "current_user": current_user,
+        "languages": languages, "comp": None, "gid": None,
+        "active_language_id": str(languages[0].id) if languages else None,
+        "translations_by_lang": {}, "source_id": None,
+        "skill_types": SkillTypeEnum, "skill_levels": SkillLevelEnum,
     })
 
 
@@ -54,33 +64,43 @@ def create_competence(
     db: Session      = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
-    c = Competence(
-        id=uuid.uuid4(),
-        gid=uuid.uuid4(),
-        user_id=current_user.id,
-        language_id=uuid.UUID(language_id),
-        nom=nom,
-        type=SkillTypeEnum(type),
-        niveau=SkillLevelEnum(niveau),
-    )
-    db.add(c)
+    db.add(Competence(
+        id=uuid.uuid4(), gid=uuid.uuid4(), user_id=current_user.id,
+        language_id=uuid.UUID(language_id), nom=nom,
+        type=SkillTypeEnum(type), niveau=SkillLevelEnum(niveau),
+    ))
     db.commit()
     return RedirectResponse(url="/competences/", status_code=303)
 
 
 @router.get("/{cid}/edit", response_class=HTMLResponse)
-def edit_competence_page(cid: str, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    c = db.query(Competence).filter(Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id).first()
-    if not c:
+def edit_competence_page(
+    cid: str, request: Request,
+    language_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    source = db.query(Competence).filter(
+        Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
+    ).first()
+    if not source:
         return RedirectResponse(url="/competences/", status_code=303)
+
     languages = db.query(Language).all()
+    translations = db.query(Competence).filter(
+        Competence.gid == source.gid, Competence.user_id == current_user.id
+    ).all()
+    translations_by_lang = {str(t.language_id): t for t in translations}
+    active_lang_id = language_id or str(source.language_id)
+    comp = translations_by_lang.get(active_lang_id, None)
+
     return templates.TemplateResponse("competences/form.html", {
-        "request": request,
-        "current_user": current_user,
-        "languages": languages,
-        "comp": c,
-        "skill_types": SkillTypeEnum,
-        "skill_levels": SkillLevelEnum,
+        "request": request, "current_user": current_user,
+        "languages": languages, "comp": comp, "source": source,
+        "gid": str(source.gid), "source_id": cid,
+        "active_language_id": active_lang_id,
+        "translations_by_lang": translations_by_lang,
+        "skill_types": SkillTypeEnum, "skill_levels": SkillLevelEnum,
     })
 
 
@@ -94,20 +114,38 @@ def update_competence(
     db: Session      = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
-    c = db.query(Competence).filter(Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id).first()
-    if c:
-        c.nom         = nom
-        c.type        = SkillTypeEnum(type)
-        c.niveau      = SkillLevelEnum(niveau)
-        c.language_id = uuid.UUID(language_id)
-        db.commit()
-    return RedirectResponse(url="/competences/", status_code=303)
+    source = db.query(Competence).filter(
+        Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
+    ).first()
+    if not source:
+        return RedirectResponse(url="/competences/", status_code=303)
+
+    lang_uuid = uuid.UUID(language_id)
+    existing = db.query(Competence).filter(
+        Competence.gid == source.gid, Competence.user_id == current_user.id,
+        Competence.language_id == lang_uuid,
+    ).first()
+
+    if existing:
+        existing.nom = nom; existing.type = SkillTypeEnum(type); existing.niveau = SkillLevelEnum(niveau)
+    else:
+        db.add(Competence(
+            id=uuid.uuid4(), gid=source.gid, user_id=current_user.id,
+            language_id=lang_uuid, nom=nom,
+            type=SkillTypeEnum(type), niveau=SkillLevelEnum(niveau),
+        ))
+    db.commit()
+    return RedirectResponse(url=f"/competences/{cid}/edit?language_id={language_id}", status_code=303)
 
 
 @router.post("/{cid}/delete")
 def delete_competence(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    c = db.query(Competence).filter(Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id).first()
-    if c:
-        db.delete(c)
+    source = db.query(Competence).filter(
+        Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Competence).filter(
+            Competence.gid == source.gid, Competence.user_id == current_user.id
+        ).delete()
         db.commit()
     return RedirectResponse(url="/competences/", status_code=303)

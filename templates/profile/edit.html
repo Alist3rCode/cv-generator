@@ -1,3 +1,4 @@
+{% from "macros.html" import lang_tabs %}
 {% extends "base.html" %}
 {% block title %}Mon profil — CV Generator{% endblock %}
 
@@ -6,8 +7,10 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" action="/profile/edit">
+    <form method="post" action="/profile/edit{% if active_language %}?language_id={{ active_language.id }}{% endif %}" id="profileForm">
+      <input type="hidden" name="language_id" value="{{ active_language.id if active_language else '' }}" />
 
+      <!-- Infos fixes -->
       <div class="row mb-3">
         <div class="col-md-6">
           <label class="form-label">Prénom</label>
@@ -18,19 +21,16 @@
           <input type="text" class="form-control" value="{{ current_user.nom }}" disabled />
         </div>
       </div>
-
       <div class="mb-3">
         <label class="form-label">Email</label>
         <input type="email" class="form-control" value="{{ current_user.email }}" disabled />
       </div>
-
       <div class="mb-3">
         <label class="form-label">Téléphone</label>
         <input type="tel" name="telephone" class="form-control"
                value="{{ profile.telephone if profile and profile.telephone else '' }}"
                placeholder="+33 6 00 00 00 00" />
       </div>
-
       <div class="mb-4">
         <label class="form-label">URL LinkedIn</label>
         <input type="url" name="linkedin_url" class="form-control"
@@ -38,8 +38,34 @@
                placeholder="https://linkedin.com/in/..." />
       </div>
 
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">
+      <hr />
+
+      <!-- Bio multi-langue -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">
+          <i class="bi bi-chat-left-text"></i> Bio / Présentation
+        </label>
+
+        {% if languages %}
+          {{ lang_tabs(languages, active_language.id | string if active_language else '', bios_by_lang, "/profile/edit") }}
+        {% endif %}
+
+        <textarea name="bio_texte" class="form-control" rows="4"
+                  placeholder="Rédigez votre présentation dans cette langue...">{{ bio.texte if bio else '' }}</textarea>
+        <div class="form-text">
+          {% if active_language %}
+            Langue active : <strong>{{ active_language.nom }}</strong>
+            {% if active_language.id | string in bios_by_lang %}
+              <span class="badge bg-success ms-1"><i class="bi bi-check"></i> Sauvegardée</span>
+            {% else %}
+              <span class="badge bg-warning text-dark ms-1">Non sauvegardée</span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-save btn-outline-secondary" id="saveBtn">
           <i class="bi bi-save"></i> Enregistrer
         </button>
         <a href="/dashboard" class="btn btn-outline-secondary">Annuler</a>
@@ -47,4 +73,29 @@
     </form>
   </div>
 </div>
+
+<script>
+(function() {
+  const form    = document.getElementById('profileForm');
+  const saveBtn = document.getElementById('saveBtn');
+  if (!form || !saveBtn) return;
+
+  const inputs = form.querySelectorAll('input:not([disabled]), textarea:not([disabled])');
+  inputs.forEach(el => { el.dataset.original = el.value; });
+
+  function checkChanges() {
+    const changed = [...inputs].some(el => el.value !== el.dataset.original);
+    if (changed) {
+      saveBtn.classList.replace('btn-outline-secondary', 'btn-primary');
+      // Marquer l'onglet actif comme non sauvegardé
+      document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.add('lang-unsaved'));
+    } else {
+      saveBtn.classList.replace('btn-primary', 'btn-outline-secondary');
+      document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.remove('lang-unsaved'));
+    }
+  }
+
+  inputs.forEach(el => el.addEventListener('input', checkChanges));
+})();
+</script>
 {% endblock %}

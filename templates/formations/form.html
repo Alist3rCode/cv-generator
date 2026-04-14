@@ -1,12 +1,24 @@
+{% from "macros.html" import lang_tabs %}
 {% extends "base.html" %}
-{% block title %}{% if formation %}Modifier{% else %}Ajouter{% endif %} une formation{% endblock %}
+{% block title %}{% if source_id %}Modifier{% else %}Ajouter{% endif %} une formation{% endblock %}
 
 {% block content %}
-<h3 class="mb-4"><i class="bi bi-mortarboard"></i> {% if formation %}Modifier{% else %}Nouvelle{% endif %} formation</h3>
+<h3 class="mb-4"><i class="bi bi-mortarboard"></i> {% if source_id %}Modifier{% else %}Nouvelle{% endif %} formation</h3>
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" action="{% if formation %}/formations/{{ formation.id }}/edit{% else %}/formations/new{% endif %}">
+    <form method="post" id="mainForm"
+          action="{% if source_id %}/formations/{{ source_id }}/edit{% else %}/formations/new{% endif %}">
+
+      {% if source_id and gid %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Langue de saisie</label>
+        {{ lang_tabs(languages, active_language_id, translations_by_lang, "/formations/" ~ source_id ~ "/edit") }}
+      </div>
+      {% endif %}
+
+      <input type="hidden" name="language_id"
+             value="{{ active_language_id or (languages[0].id | string if languages else '') }}" />
 
       <div class="row mb-3">
         <div class="col-md-6">
@@ -25,23 +37,23 @@
         <div class="col-md-4">
           <label class="form-label">Date de début <span class="text-danger">*</span></label>
           <input type="date" name="date_debut" class="form-control" required
-                 value="{{ formation.date_debut.isoformat() if formation else '' }}" />
+                 value="{{ formation.date_debut.isoformat() if formation else (source.date_debut.isoformat() if source else '') }}" />
         </div>
         <div class="col-md-4">
           <label class="form-label">Date de fin</label>
           <input type="date" name="date_fin" class="form-control"
-                 value="{{ formation.date_fin.isoformat() if formation and formation.date_fin else '' }}" />
+                 value="{{ formation.date_fin.isoformat() if formation and formation.date_fin else (source.date_fin.isoformat() if source and source.date_fin else '') }}" />
         </div>
+        {% if not source_id %}
         <div class="col-md-4">
           <label class="form-label">Langue <span class="text-danger">*</span></label>
           <select name="language_id" class="form-select" required>
             {% for lang in languages %}
-            <option value="{{ lang.id }}" {% if formation and formation.language_id == lang.id %}selected{% endif %}>
-              {{ lang.nom }}
-            </option>
+            <option value="{{ lang.id }}">{{ lang.nom }}</option>
             {% endfor %}
           </select>
         </div>
+        {% endif %}
       </div>
 
       <div class="mb-4">
@@ -50,10 +62,29 @@
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Enregistrer</button>
+        <button type="submit" class="btn btn-save btn-outline-secondary" id="saveBtn">
+          <i class="bi bi-save"></i> Enregistrer
+        </button>
         <a href="/formations/" class="btn btn-outline-secondary">Annuler</a>
       </div>
     </form>
   </div>
 </div>
+
+<script>
+(function() {
+  const form = document.getElementById('mainForm');
+  const saveBtn = document.getElementById('saveBtn');
+  if (!form || !saveBtn) return;
+  const inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
+  inputs.forEach(el => { el.dataset.original = el.value; });
+  function checkChanges() {
+    const changed = [...inputs].some(el => el.value !== el.dataset.original);
+    saveBtn.classList.toggle('btn-primary', changed);
+    saveBtn.classList.toggle('btn-outline-secondary', !changed);
+    document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.toggle('lang-unsaved', changed));
+  }
+  inputs.forEach(el => el.addEventListener('input', checkChanges));
+})();
+</script>
 {% endblock %}

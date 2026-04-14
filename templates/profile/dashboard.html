@@ -2,75 +2,117 @@
 {% block title %}Tableau de bord — CV Generator{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Bonjour, {{ current_user.prenom }} {{ current_user.nom }} <i class="bi bi-hand-wave"></i></h2>
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+  <h2 class="mb-0">Bonjour, {{ current_user.prenom }} {{ current_user.nom }} <i class="bi bi-hand-wave"></i></h2>
+
+  <!-- Donut de complétion -->
+  <div class="text-center">
+    <div class="completion-wrapper">
+      <canvas id="completionChart" width="160" height="160"></canvas>
+      <div class="completion-label">{{ completion }}%</div>
+      <div class="completion-sublabel">complété</div>
+    </div>
+    <div class="mt-2 d-flex gap-2 justify-content-center flex-wrap">
+      {% set checks = [
+        ("bio",        "bi-chat-left-text", "Bio"),
+        ("experience", "bi-briefcase",      "Expérience"),
+        ("formation",  "bi-mortarboard",    "Formation"),
+        ("competence", "bi-stars",          "Compétence"),
+      ] %}
+      {% for key, icon, label in checks %}
+      <span class="badge {% if criteria[key] %}bg-success{% else %}bg-light text-secondary border{% endif %} d-flex align-items-center gap-1">
+        <i class="bi {{ icon }}"></i> {{ label }}
+        {% if criteria[key] %}<i class="bi bi-check-lg"></i>{% endif %}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
 
 <div class="row g-4">
 
   <div class="col-md-4">
-    <div class="card h-100 border-primary">
-      <div class="card-body text-center">
+    <a href="/profile/edit" class="card-clickable card h-100 border-primary shadow-sm">
+      <div class="card-body text-center py-4">
         <i class="bi bi-person-vcard fs-1 text-primary"></i>
-        <h5 class="card-title mt-2">Profil</h5>
-        <p class="card-text text-muted">Téléphone, LinkedIn</p>
-        <a href="/profile/edit" class="btn btn-outline-primary btn-sm">Modifier</a>
+        <h5 class="card-title mt-2">Profil & Bio</h5>
+        <p class="card-text text-muted small">Téléphone, LinkedIn, présentation</p>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-md-4">
-    <div class="card h-100 border-success">
-      <div class="card-body text-center">
+    <a href="/experiences/" class="card-clickable card h-100 border-success shadow-sm">
+      <div class="card-body text-center py-4">
         <i class="bi bi-briefcase fs-1 text-success"></i>
         <h5 class="card-title mt-2">Expériences</h5>
-        <p class="card-text text-muted">Expériences professionnelles</p>
-        <a href="/experiences/" class="btn btn-outline-success btn-sm">Gérer</a>
+        <p class="card-text text-muted small">Expériences professionnelles</p>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-md-4">
-    <div class="card h-100 border-info">
-      <div class="card-body text-center">
+    <a href="/formations/" class="card-clickable card h-100 border-info shadow-sm">
+      <div class="card-body text-center py-4">
         <i class="bi bi-mortarboard fs-1 text-info"></i>
         <h5 class="card-title mt-2">Formations</h5>
-        <p class="card-text text-muted">Diplômes et formations</p>
-        <a href="/formations/" class="btn btn-outline-info btn-sm">Gérer</a>
+        <p class="card-text text-muted small">Diplômes et formations</p>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-md-4">
-    <div class="card h-100 border-warning">
-      <div class="card-body text-center">
+    <a href="/certifications/" class="card-clickable card h-100 border-warning shadow-sm">
+      <div class="card-body text-center py-4">
         <i class="bi bi-patch-check fs-1 text-warning"></i>
         <h5 class="card-title mt-2">Certifications</h5>
-        <p class="card-text text-muted">Certifications professionnelles</p>
-        <a href="/certifications/" class="btn btn-outline-warning btn-sm">Gérer</a>
+        <p class="card-text text-muted small">Certifications professionnelles</p>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-md-4">
-    <div class="card h-100 border-secondary">
-      <div class="card-body text-center">
+    <a href="/competences/" class="card-clickable card h-100 border-secondary shadow-sm">
+      <div class="card-body text-center py-4">
         <i class="bi bi-stars fs-1 text-secondary"></i>
         <h5 class="card-title mt-2">Compétences</h5>
-        <p class="card-text text-muted">Hard skills &amp; soft skills</p>
-        <a href="/competences/" class="btn btn-outline-secondary btn-sm">Gérer</a>
+        <p class="card-text text-muted small">Hard skills &amp; soft skills</p>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-md-4">
-    <div class="card h-100 border-danger">
-      <div class="card-body text-center">
+    <a href="/exports/" class="card-clickable card h-100 border-danger shadow-sm">
+      <div class="card-body text-center py-4">
         <i class="bi bi-file-earmark-arrow-down fs-1 text-danger"></i>
         <h5 class="card-title mt-2">Exporter mon CV</h5>
-        <p class="card-text text-muted">Générer en DOCX ou PDF</p>
-        <a href="/exports/" class="btn btn-danger btn-sm">Générer</a>
+        <p class="card-text text-muted small">Générer en DOCX ou PDF</p>
       </div>
-    </div>
+    </a>
   </div>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  const completion = {{ completion }};
+  new Chart(document.getElementById('completionChart'), {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [completion, 100 - completion],
+        backgroundColor: [
+          completion === 100 ? '#198754' : '#0d6efd',
+          '#e9ecef'
+        ],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      cutout: '72%',
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      animation: { duration: 900, easing: 'easeOutQuart' },
+    }
+  });
+</script>
 {% endblock %}

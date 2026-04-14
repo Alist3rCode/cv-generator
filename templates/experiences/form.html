@@ -1,15 +1,28 @@
+{% from "macros.html" import lang_tabs %}
 {% extends "base.html" %}
-{% block title %}{% if exp %}Modifier{% else %}Ajouter{% endif %} une expérience — CV Generator{% endblock %}
+{% block title %}{% if source_id %}Modifier{% else %}Ajouter{% endif %} une expérience{% endblock %}
 
 {% block content %}
 <h3 class="mb-4">
   <i class="bi bi-briefcase"></i>
-  {% if exp %}Modifier l'expérience{% else %}Nouvelle expérience{% endif %}
+  {% if source_id %}Modifier l'expérience{% else %}Nouvelle expérience{% endif %}
 </h3>
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" action="{% if exp %}/experiences/{{ exp.id }}/edit{% else %}/experiences/new{% endif %}">
+    <form method="post" id="mainForm"
+          action="{% if source_id %}/experiences/{{ source_id }}/edit{% else %}/experiences/new{% endif %}">
+
+      <!-- Onglets langue (uniquement en mode édition) -->
+      {% if source_id and gid %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Langue de saisie</label>
+        {{ lang_tabs(languages, active_language_id, translations_by_lang, "/experiences/" ~ source_id ~ "/edit") }}
+      </div>
+      {% endif %}
+
+      <input type="hidden" name="language_id"
+             value="{{ active_language_id or (languages[0].id | string if languages else '') }}" />
 
       <div class="row mb-3">
         <div class="col-md-6">
@@ -28,19 +41,18 @@
         <div class="col-md-6">
           <label class="form-label">Localisation</label>
           <input type="text" name="location" class="form-control"
-                 value="{{ exp.location if exp and exp.location else '' }}"
-                 placeholder="Paris, France" />
+                 value="{{ exp.location if exp and exp.location else '' }}" placeholder="Paris, France" />
         </div>
         <div class="col-md-3">
           <label class="form-label">Date de début <span class="text-danger">*</span></label>
           <input type="date" name="date_debut" class="form-control" required
-                 value="{{ exp.date_debut.isoformat() if exp else '' }}" />
+                 value="{{ exp.date_debut.isoformat() if exp else (source.date_debut.isoformat() if source else '') }}" />
         </div>
         <div class="col-md-3">
           <label class="form-label">Date de fin</label>
           <input type="date" name="date_fin" class="form-control"
-                 value="{{ exp.date_fin.isoformat() if exp and exp.date_fin else '' }}" />
-          <div class="form-text">Laisser vide = poste actuel</div>
+                 value="{{ exp.date_fin.isoformat() if exp and exp.date_fin else (source.date_fin.isoformat() if source and source.date_fin else '') }}" />
+          <div class="form-text">Vide = poste actuel</div>
         </div>
       </div>
 
@@ -50,24 +62,25 @@
                value="{{ exp.project_summary if exp and exp.project_summary else '' }}" />
       </div>
 
-      <div class="mb-3">
+      <div class="mb-4">
         <label class="form-label">Description</label>
         <textarea name="description" class="form-control" rows="4">{{ exp.description if exp and exp.description else '' }}</textarea>
       </div>
 
+      <!-- Sélecteur de langue pour "nouveau" -->
+      {% if not source_id %}
       <div class="mb-4">
         <label class="form-label">Langue <span class="text-danger">*</span></label>
         <select name="language_id" class="form-select" required>
           {% for lang in languages %}
-          <option value="{{ lang.id }}" {% if exp and exp.language_id == lang.id %}selected{% endif %}>
-            {{ lang.nom }}
-          </option>
+          <option value="{{ lang.id }}">{{ lang.nom }}</option>
           {% endfor %}
         </select>
       </div>
+      {% endif %}
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-save btn-outline-secondary" id="saveBtn">
           <i class="bi bi-save"></i> Enregistrer
         </button>
         <a href="/experiences/" class="btn btn-outline-secondary">Annuler</a>
@@ -75,4 +88,21 @@
     </form>
   </div>
 </div>
+
+<script>
+(function() {
+  const form    = document.getElementById('mainForm');
+  const saveBtn = document.getElementById('saveBtn');
+  if (!form || !saveBtn) return;
+  const inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
+  inputs.forEach(el => { el.dataset.original = el.value; });
+  function checkChanges() {
+    const changed = [...inputs].some(el => el.value !== el.dataset.original);
+    saveBtn.classList.toggle('btn-primary', changed);
+    saveBtn.classList.toggle('btn-outline-secondary', !changed);
+    document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.toggle('lang-unsaved', changed));
+  }
+  inputs.forEach(el => el.addEventListener('input', checkChanges));
+})();
+</script>
 {% endblock %}
