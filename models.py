@@ -242,6 +242,7 @@ class Formation(TranslatableMixin, AuditMixin, Base):
     user_id        = Column(Uuid, ForeignKey("user.id"), nullable=False)
     diplome        = Column(String(200), nullable=False)
     etablissement  = Column(String(200), nullable=False)
+    ville          = Column(String(100), nullable=True)
     date_debut     = Column(Date,        nullable=False)
     date_fin       = Column(Date,        nullable=True)
     description    = Column(Text,        nullable=True)

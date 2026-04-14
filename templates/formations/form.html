@@ -34,6 +34,16 @@
       </div>
 
       <div class="row mb-3">
+        <div class="col-md-6 position-relative">
+          <label class="form-label">Ville</label>
+          <input type="text" name="ville" id="villeInput" class="form-control" autocomplete="off"
+                 value="{{ formation.ville if formation and formation.ville else '' }}" placeholder="Paris, France" />
+          <ul id="villeSuggestions" class="list-group position-absolute w-100 shadow-sm"
+              style="z-index:1000;display:none;top:100%;left:0;"></ul>
+        </div>
+      </div>
+
+      <div class="row mb-3">
         <div class="col-md-4">
           <label class="form-label">Date de début <span class="text-danger">*</span></label>
           <input type="date" name="date_debut" class="form-control" required
@@ -73,19 +83,64 @@
 
 <script>
 (function() {
-  const form = document.getElementById('mainForm');
-  const saveBtn = document.getElementById('saveBtn');
+  var form    = document.getElementById('mainForm');
+  var saveBtn = document.getElementById('saveBtn');
   if (!form || !saveBtn) return;
-  const inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
-  inputs.forEach(el => { el.dataset.original = el.value; });
+  var inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
+  inputs.forEach(function(el) { el.dataset.original = el.value; });
   function checkChanges() {
-    const changed = [...inputs].some(el => el.value !== el.dataset.original);
+    var changed = Array.from(inputs).some(function(el) { return el.value !== el.dataset.original; });
     saveBtn.classList.toggle('btn-primary', changed);
     saveBtn.classList.toggle('btn-outline-secondary', !changed);
     window.__formDirty = changed;
-    document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.toggle('lang-unsaved', changed));
+    document.querySelectorAll('.lang-tab-btn.active').forEach(function(t) { t.classList.toggle('lang-unsaved', changed); });
   }
-  inputs.forEach(el => el.addEventListener('input', checkChanges));
+  inputs.forEach(function(el) { el.addEventListener('input', checkChanges); });
+
+  // Autocomplete ville via Nominatim
+  var villeInput = document.getElementById('villeInput');
+  var villeList  = document.getElementById('villeSuggestions');
+  if (villeInput && villeList) {
+    var timer = null;
+    villeInput.addEventListener('input', function() {
+      clearTimeout(timer);
+      var q = villeInput.value.trim();
+      if (q.length < 2) { villeList.style.display = 'none'; return; }
+      timer = setTimeout(function() {
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=' + encodeURIComponent(q), {
+          headers: { 'Accept-Language': 'fr' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(results) {
+          villeList.innerHTML = '';
+          var seen = new Set();
+          results.forEach(function(r) {
+            var city    = r.address.city || r.address.town || r.address.village || r.address.county || r.display_name.split(',')[0];
+            var country = r.address.country || '';
+            var label   = city.trim() + (country ? ', ' + country : '');
+            if (seen.has(label)) return;
+            seen.add(label);
+            var li = document.createElement('li');
+            li.className = 'list-group-item list-group-item-action py-1 small';
+            li.style.cursor = 'pointer';
+            li.textContent  = label;
+            li.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              villeInput.value = label;
+              villeList.style.display = 'none';
+              checkChanges();
+            });
+            villeList.appendChild(li);
+          });
+          villeList.style.display = villeList.children.length ? 'block' : 'none';
+        })
+        .catch(function() { villeList.style.display = 'none'; });
+      }, 400);
+    });
+    document.addEventListener('click', function(e) {
+      if (!villeList.contains(e.target) && e.target !== villeInput) villeList.style.display = 'none';
+    });
+  }
 })();
 </script>
 {{ unsaved_guard("mainForm") }}

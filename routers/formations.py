@@ -65,6 +65,7 @@ def new_formation_page(request: Request, db: Session = Depends(get_db), current_
 def create_formation(
     diplome: str              = Form(...),
     etablissement: str        = Form(...),
+    ville: Optional[str]      = Form(None),
     date_debut: str           = Form(...),
     date_fin: Optional[str]   = Form(None),
     description: Optional[str] = Form(None),
@@ -75,7 +76,7 @@ def create_formation(
     db.add(Formation(
         id=uuid.uuid4(), gid=uuid.uuid4(), user_id=current_user.id,
         language_id=uuid.UUID(language_id), diplome=diplome,
-        etablissement=etablissement, date_debut=_parse_date(date_debut),
+        etablissement=etablissement, ville=ville or None, date_debut=_parse_date(date_debut),
         date_fin=_parse_date(date_fin), description=description or None,
     ))
     db.commit()
@@ -117,6 +118,7 @@ def update_formation(
     fid: str,
     diplome: str              = Form(...),
     etablissement: str        = Form(...),
+    ville: Optional[str]      = Form(None),
     date_debut: str           = Form(...),
     date_fin: Optional[str]   = Form(None),
     description: Optional[str] = Form(None),
@@ -138,12 +140,12 @@ def update_formation(
 
     if existing:
         existing.diplome = diplome; existing.etablissement = etablissement
-        existing.date_debut = _parse_date(date_debut); existing.date_fin = _parse_date(date_fin)
+        existing.ville = ville or None; existing.date_debut = _parse_date(date_debut); existing.date_fin = _parse_date(date_fin)
         existing.description = description or None
     else:
         db.add(Formation(
             id=uuid.uuid4(), gid=source.gid, user_id=current_user.id,
-            language_id=lang_uuid, diplome=diplome, etablissement=etablissement,
+            language_id=lang_uuid, diplome=diplome, etablissement=etablissement, ville=ville or None,
             date_debut=_parse_date(date_debut), date_fin=_parse_date(date_fin), description=description or None,
         ))
     db.commit()

@@ -16,7 +16,10 @@
   <div class="card-body d-flex justify-content-between">
     <div>
       <h5 class="mb-1">{{ f.diplome }}</h5>
-      <p class="mb-1 text-muted"><i class="bi bi-building"></i> {{ f.etablissement }}</p>
+      <p class="mb-1 text-muted">
+        <i class="bi bi-building"></i> {{ f.etablissement }}
+        {% if f.ville %}&nbsp;&middot;&nbsp;<i class="bi bi-geo-alt"></i> {{ f.ville }}{% endif %}
+      </p>
       <small class="text-muted">
         {{ f.date_debut.strftime('%m/%Y') }} →
         {% if f.date_fin %}{{ f.date_fin.strftime('%m/%Y') }}{% else %}En cours{% endif %}
