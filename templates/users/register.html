@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Créer un compte — CV Generator{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+  <div class="col-md-6">
+    <div class="card shadow">
+      <div class="card-body p-4">
+        <h3 class="card-title mb-4"><i class="bi bi-person-plus"></i> Créer un compte</h3>
+
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/users/register">
+          <div class="row mb-3">
+            <div class="col">
+              <label class="form-label">Prénom</label>
+              <input type="text" name="prenom" class="form-control" required />
+            </div>
+            <div class="col">
+              <label class="form-label">Nom</label>
+              <input type="text" name="nom" class="form-control" required />
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Mot de passe</label>
+            <input type="password" name="password" class="form-control" minlength="8" required />
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Organisation</label>
+            <select name="organisation_id" class="form-select" required>
+              <option value="">-- Choisir --</option>
+              {% for org in organisations %}
+              <option value="{{ org.id }}">{{ org.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Créer mon compte</button>
+        </form>
+
+        <p class="text-center mt-3 mb-0">
+          <a href="/login">Déjà un compte ? Se connecter</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

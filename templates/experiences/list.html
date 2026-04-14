@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Expériences — CV Generator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3><i class="bi bi-briefcase"></i> Expériences professionnelles</h3>
+  <a href="/experiences/new" class="btn btn-success">
+    <i class="bi bi-plus-circle"></i> Ajouter
+  </a>
+</div>
+
+{% if not experiences %}
+<div class="alert alert-info">Aucune expérience enregistrée. Cliquez sur "Ajouter" pour commencer.</div>
+{% endif %}
+
+{% for exp in experiences %}
+<div class="card mb-3 shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between">
+      <div>
+        <h5 class="mb-1">{{ exp.titre_poste }}</h5>
+        <p class="mb-1 text-muted">
+          <i class="bi bi-building"></i> {{ exp.entreprise }}
+          {% if exp.location %} &nbsp;·&nbsp; <i class="bi bi-geo-alt"></i> {{ exp.location }}{% endif %}
+        </p>
+        <small class="text-muted">
+          {{ exp.date_debut.strftime('%m/%Y') }} →
+          {% if exp.date_fin %}{{ exp.date_fin.strftime('%m/%Y') }}{% else %}Présent{% endif %}
+        </small>
+        {% if exp.project_summary %}
+        <p class="mt-2 mb-1"><strong>Projet :</strong> {{ exp.project_summary }}</p>
+        {% endif %}
+        {% if exp.description %}
+        <p class="mt-1 mb-0 text-muted">{{ exp.description[:150] }}{% if exp.description|length > 150 %}...{% endif %}</p>
+        {% endif %}
+      </div>
+      <div class="d-flex flex-column gap-2 ms-3">
+        <a href="/experiences/{{ exp.id }}/edit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-pencil"></i>
+        </a>
+        <form method="post" action="/experiences/{{ exp.id }}/delete"
+              onsubmit="return confirm('Supprimer cette expérience ?')">
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

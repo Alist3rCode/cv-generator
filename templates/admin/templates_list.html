@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Templates Word — CV Generator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3><i class="bi bi-layout-text-window"></i> Templates Word (Admin)</h3>
+  <a href="/templates/upload" class="btn btn-success"><i class="bi bi-upload"></i> Importer un template</a>
+</div>
+
+{% if not admin_orgs %}
+<div class="alert alert-warning">
+  Vous n'êtes administrateur d'aucune organisation. Contactez un super-admin.
+</div>
+{% endif %}
+
+{% if not templates %}
+<div class="alert alert-info">Aucun template importé. Importez un fichier .docx avec les balises.</div>
+{% endif %}
+
+{% for t in templates %}
+<div class="card mb-3 shadow-sm {% if t.is_active %}border-success{% else %}border-secondary{% endif %}">
+  <div class="card-body d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="mb-1">
+        {{ t.nom }}
+        {% if t.is_active %}
+        <span class="badge bg-success ms-2">Actif</span>
+        {% else %}
+        <span class="badge bg-secondary ms-2">Inactif</span>
+        {% endif %}
+      </h5>
+      <small class="text-muted">Importé le {{ t.created_at.strftime('%d/%m/%Y') }}</small>
+    </div>
+    <div class="d-flex gap-2">
+      <form method="post" action="/templates/{{ t.id }}/toggle">
+        <button type="submit" class="btn btn-sm {% if t.is_active %}btn-outline-secondary{% else %}btn-outline-success{% endif %}">
+          {% if t.is_active %}<i class="bi bi-pause"></i> Désactiver{% else %}<i class="bi bi-play"></i> Activer{% endif %}
+        </button>
+      </form>
+      <form method="post" action="/templates/{{ t.id }}/delete" onsubmit="return confirm('Supprimer ce template ?')">
+        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<div class="card mt-4 bg-light">
+  <div class="card-body">
+    <h6><i class="bi bi-info-circle"></i> Balises disponibles pour vos templates Word</h6>
+    <div class="row mt-2">
+      <div class="col-md-4">
+        <strong>Données personnelles</strong>
+        <ul class="small mt-1">
+          <li><code>{{"{{"}}NOM{{"}}"}}</code> <code>{{"{{"}}PRENOM{{"}}"}}</code></li>
+          <li><code>{{"{{"}}EMAIL{{"}}"}}</code> <code>{{"{{"}}TELEPHONE{{"}}"}}</code></li>
+          <li><code>{{"{{"}}LINKEDIN{{"}}"}}</code> <code>{{"{{"}}BIO{{"}}"}}</code></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <strong>Sections répétées (tableaux)</strong>
+        <ul class="small mt-1">
+          <li>Exp : <code>{{"{{"}}EXP_TITRE{{"}}"}}</code> <code>{{"{{"}}EXP_ENTREPRISE{{"}}"}}</code>...</li>
+          <li>Form : <code>{{"{{"}}FORM_DIPLOME{{"}}"}}</code> <code>{{"{{"}}FORM_ETAB{{"}}"}}</code>...</li>
+          <li>Cert : <code>{{"{{"}}CERT_TITRE{{"}}"}}</code> <code>{{"{{"}}CERT_ORG{{"}}"}}</code>...</li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <strong>Compétences (tableaux)</strong>
+        <ul class="small mt-1">
+          <li>Hard : <code>{{"{{"}}HARD_NOM{{"}}"}}</code> <code>{{"{{"}}HARD_NIVEAU{{"}}"}}</code></li>
+          <li>Soft : <code>{{"{{"}}SOFT_NOM{{"}}"}}</code> <code>{{"{{"}}SOFT_NIVEAU{{"}}"}}</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

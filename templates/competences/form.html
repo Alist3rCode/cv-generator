@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{% if comp %}Modifier{% else %}Ajouter{% endif %} une compétence{% endblock %}
+
+{% block content %}
+<h3 class="mb-4"><i class="bi bi-stars"></i> {% if comp %}Modifier{% else %}Nouvelle{% endif %} compétence</h3>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" action="{% if comp %}/competences/{{ comp.id }}/edit{% else %}/competences/new{% endif %}">
+
+      <div class="mb-3">
+        <label class="form-label">Nom de la compétence <span class="text-danger">*</span></label>
+        <input type="text" name="nom" class="form-control" required
+               value="{{ comp.nom if comp else '' }}" placeholder="Python, Communication, ..." />
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Type <span class="text-danger">*</span></label>
+          <select name="type" class="form-select" required>
+            <option value="hard" {% if comp and comp.type.value == 'hard' %}selected{% endif %}>Hard skill</option>
+            <option value="soft" {% if comp and comp.type.value == 'soft' %}selected{% endif %}>Soft skill</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Niveau <span class="text-danger">*</span></label>
+          <select name="niveau" class="form-select" required>
+            <option value="1" {% if comp and comp.niveau.value == 1 %}selected{% endif %}>1 - Débutant</option>
+            <option value="2" {% if comp and comp.niveau.value == 2 %}selected{% endif %}>2 - Intermédiaire</option>
+            <option value="3" {% if comp and comp.niveau.value == 3 %}selected{% endif %}>3 - Avancé</option>
+            <option value="4" {% if comp and comp.niveau.value == 4 %}selected{% endif %}>4 - Expert</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Langue <span class="text-danger">*</span></label>
+          <select name="language_id" class="form-select" required>
+            {% for lang in languages %}
+            <option value="{{ lang.id }}" {% if comp and comp.language_id == lang.id %}selected{% endif %}>
+              {{ lang.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Enregistrer</button>
+        <a href="/competences/" class="btn btn-outline-secondary">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

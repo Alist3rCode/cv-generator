@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{% if exp %}Modifier{% else %}Ajouter{% endif %} une expérience — CV Generator{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">
+  <i class="bi bi-briefcase"></i>
+  {% if exp %}Modifier l'expérience{% else %}Nouvelle expérience{% endif %}
+</h3>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" action="{% if exp %}/experiences/{{ exp.id }}/edit{% else %}/experiences/new{% endif %}">
+
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Titre du poste <span class="text-danger">*</span></label>
+          <input type="text" name="titre_poste" class="form-control" required
+                 value="{{ exp.titre_poste if exp else '' }}" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Entreprise <span class="text-danger">*</span></label>
+          <input type="text" name="entreprise" class="form-control" required
+                 value="{{ exp.entreprise if exp else '' }}" />
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Localisation</label>
+          <input type="text" name="location" class="form-control"
+                 value="{{ exp.location if exp and exp.location else '' }}"
+                 placeholder="Paris, France" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Date de début <span class="text-danger">*</span></label>
+          <input type="date" name="date_debut" class="form-control" required
+                 value="{{ exp.date_debut.isoformat() if exp else '' }}" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Date de fin</label>
+          <input type="date" name="date_fin" class="form-control"
+                 value="{{ exp.date_fin.isoformat() if exp and exp.date_fin else '' }}" />
+          <div class="form-text">Laisser vide = poste actuel</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Résumé du projet</label>
+        <input type="text" name="project_summary" class="form-control"
+               value="{{ exp.project_summary if exp and exp.project_summary else '' }}" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control" rows="4">{{ exp.description if exp and exp.description else '' }}</textarea>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Langue <span class="text-danger">*</span></label>
+        <select name="language_id" class="form-select" required>
+          {% for lang in languages %}
+          <option value="{{ lang.id }}" {% if exp and exp.language_id == lang.id %}selected{% endif %}>
+            {{ lang.nom }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save"></i> Enregistrer
+        </button>
+        <a href="/experiences/" class="btn btn-outline-secondary">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{% if formation %}Modifier{% else %}Ajouter{% endif %} une formation{% endblock %}
+
+{% block content %}
+<h3 class="mb-4"><i class="bi bi-mortarboard"></i> {% if formation %}Modifier{% else %}Nouvelle{% endif %} formation</h3>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" action="{% if formation %}/formations/{{ formation.id }}/edit{% else %}/formations/new{% endif %}">
+
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Diplôme <span class="text-danger">*</span></label>
+          <input type="text" name="diplome" class="form-control" required
+                 value="{{ formation.diplome if formation else '' }}" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Établissement <span class="text-danger">*</span></label>
+          <input type="text" name="etablissement" class="form-control" required
+                 value="{{ formation.etablissement if formation else '' }}" />
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Date de début <span class="text-danger">*</span></label>
+          <input type="date" name="date_debut" class="form-control" required
+                 value="{{ formation.date_debut.isoformat() if formation else '' }}" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Date de fin</label>
+          <input type="date" name="date_fin" class="form-control"
+                 value="{{ formation.date_fin.isoformat() if formation and formation.date_fin else '' }}" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Langue <span class="text-danger">*</span></label>
+          <select name="language_id" class="form-select" required>
+            {% for lang in languages %}
+            <option value="{{ lang.id }}" {% if formation and formation.language_id == lang.id %}selected{% endif %}>
+              {{ lang.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control" rows="3">{{ formation.description if formation and formation.description else '' }}</textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Enregistrer</button>
+        <a href="/formations/" class="btn btn-outline-secondary">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
