@@ -136,3 +136,29 @@ main.container {
 [data-bs-theme="dark"] .ql-toolbar button svg .ql-stroke { stroke: var(--bs-body-color); }
 [data-bs-theme="dark"] .ql-toolbar button svg .ql-fill  { fill:  var(--bs-body-color); }
 [data-bs-theme="dark"] .ql-picker-label { color: var(--bs-body-color); }
+
+/* ── Navbar custom (indigo doux, adaptatif) ─────────── */
+.navbar-app {
+  background-color: #4f46e5;   /* indigo-600 — light mode */
+}
+[data-bs-theme="dark"] .navbar-app {
+  background-color: #1e1b4b;   /* indigo-950 — dark mode */
+}
+/* Conserver les textes blancs navbar-dark */
+.navbar-app .navbar-brand,
+.navbar-app .nav-link,
+.navbar-app .navbar-toggler-icon,
+.navbar-app .dropdown-toggle {
+  color: rgba(255,255,255,.9) !important;
+}
+.navbar-app .nav-link:hover,
+.navbar-app .nav-link.active {
+  color: #fff !important;
+}
+.navbar-app .navbar-toggler {
+  border-color: rgba(255,255,255,.3);
+}
+
+/* Donut — couleur principale via CSS var pour JS */
+:root         { --chart-primary: #6366f1; }
+[data-bs-theme="dark"] { --chart-primary: #818cf8; }

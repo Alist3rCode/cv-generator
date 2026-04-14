@@ -65,7 +65,10 @@
 {% if bio %}
 <div class="card shadow-sm mb-4">
   <div class="card-body">
-    <h6 class="text-muted mb-2"><i class="bi bi-chat-left-text"></i> Présentation</h6>
+    <div class="d-flex justify-content-between align-items-start">
+      <h6 class="text-muted mb-2"><i class="bi bi-chat-left-text"></i> Présentation</h6>
+      <a href="/profile/edit" class="btn btn-sm btn-outline-secondary ms-2" title="Modifier"><i class="bi bi-pencil"></i></a>
+    </div>
     <p class="mb-0">{{ bio.texte }}</p>
   </div>
 </div>
@@ -85,11 +88,12 @@
         <ul class="list-group list-group-flush">
           {% for cert in certifications %}
           <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
+            <div class="flex-grow-1">
               <span class="fw-semibold">{{ cert.titre }}</span>
               <small class="text-muted d-block">{{ cert.organisme }}</small>
             </div>
             <small class="text-muted ms-2 text-nowrap">{{ cert.date_obtention.strftime('%m/%Y') }}</small>
+            <a href="/certifications/{{ cert.id }}/edit" class="btn btn-sm btn-outline-secondary ms-2" title="Modifier"><i class="bi bi-pencil"></i></a>
           </li>
           {% endfor %}
         </ul>
@@ -107,11 +111,12 @@
         <ul class="list-group list-group-flush">
           {% for f in formations %}
           <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
+            <div class="flex-grow-1">
               <span class="fw-semibold">{{ f.diplome }}</span>
               <small class="text-muted d-block">{{ f.etablissement }}</small>
             </div>
             <small class="text-muted ms-2 text-nowrap">{{ f.date_debut.strftime('%Y') }}</small>
+            <a href="/formations/{{ f.id }}/edit" class="btn btn-sm btn-outline-secondary ms-2" title="Modifier"><i class="bi bi-pencil"></i></a>
           </li>
           {% endfor %}
         </ul>
@@ -131,7 +136,7 @@
       {% for exp in experiences %}
       <li class="list-group-item">
         <div class="d-flex justify-content-between align-items-start">
-          <div>
+          <div class="flex-grow-1">
             <span class="fw-semibold">{{ exp.titre_poste }}</span>
             <small class="text-muted ms-2">{{ exp.entreprise }}{% if exp.location %} &middot; {{ exp.location }}{% endif %}</small>
           </div>
@@ -140,6 +145,7 @@
             {% if exp.date_fin %}{{ exp.date_fin.strftime('%m/%Y') }}{% else %}Présent{% endif %}
             &nbsp;<span class="badge bg-secondary">{{ exp | exp_duration }}</span>
           </small>
+          <a href="/experiences/{{ exp.id }}/edit" class="btn btn-sm btn-outline-secondary ms-2 flex-shrink-0" title="Modifier"><i class="bi bi-pencil"></i></a>
         </div>
         {% if exp.project_summary %}<small class="text-muted d-block mt-1">{{ exp.project_summary }}</small>{% endif %}
       </li>
@@ -164,7 +170,7 @@
         backgroundColor: (function() {
           var style = getComputedStyle(document.documentElement);
           return [
-            completion === 100 ? '#198754' : '#0d6efd',
+            completion === 100 ? '#22c55e' : getComputedStyle(document.documentElement).getPropertyValue('--chart-primary').trim(),
             style.getPropertyValue('--bs-secondary-bg').trim() || '#e9ecef'
           ];
         })(),
