@@ -18,6 +18,35 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Templates Jinja2
 templates_jinja = Jinja2Templates(directory="templates")
 
+
+def _exp_duration_filter(exp):
+    """Filtre Jinja2 : calcule la durée d'une expérience en texte lisible."""
+    from datetime import date
+    start = exp.date_debut
+    end   = exp.date_fin or date.today()
+    total_months = (end.year - start.year) * 12 + (end.month - start.month)
+    if total_months < 1:
+        total_months = 1
+    years  = total_months // 12
+    months = total_months % 12
+    parts  = []
+    if years:
+        parts.append(f"{years} an{'s' if years > 1 else ''}")
+    if months:
+        parts.append(f"{months} mois")
+    return " ".join(parts) if parts else "< 1 mois"
+
+
+# Enregistrer le filtre sur TOUS les routeurs qui utilisent Jinja2
+def _register_filters():
+    import routers.experiences as _exp_router
+    import routers.profile as _profile_router
+    for mod in [_exp_router, _profile_router]:
+        mod.templates.env.filters["exp_duration"] = _exp_duration_filter
+
+
+_register_filters()
+
 # Routers
 app.include_router(auth.router)
 app.include_router(users.router)

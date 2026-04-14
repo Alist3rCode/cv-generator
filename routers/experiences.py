@@ -18,9 +18,14 @@ from routers.auth import require_user
 router = APIRouter(prefix="/experiences", tags=["experiences"])
 
 def _parse_date(value):
-    """Convertit une chaine ISO en date, retourne None si vide."""
+    """Convertit une chaine en date (YYYY-MM ou YYYY-MM-DD), 1er du mois, None si vide."""
     from datetime import date as _date
-    return _date.fromisoformat(value) if value and value.strip() else None
+    if not value or not value.strip():
+        return None
+    v = value.strip()
+    if len(v) == 7:          # format "YYYY-MM" depuis type="month"
+        return _date(int(v[:4]), int(v[5:7]), 1)
+    return _date.fromisoformat(v)
 
 templates = Jinja2Templates(directory="templates")
 

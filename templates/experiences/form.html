@@ -3,7 +3,6 @@
 {% block title %}{% if source_id %}Modifier{% else %}Ajouter{% endif %} une expérience{% endblock %}
 
 {% block head_extra %}
-<!-- Quill rich text editor -->
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
 {% endblock %}
 
@@ -18,7 +17,6 @@
     <form method="post" id="mainForm"
           action="{% if source_id %}/experiences/{{ source_id }}/edit{% else %}/experiences/new{% endif %}">
 
-      <!-- Onglets langue (uniquement en mode édition) -->
       {% if source_id and gid %}
       <div class="mb-3">
         <label class="form-label fw-semibold">Langue de saisie</label>
@@ -43,20 +41,22 @@
       </div>
 
       <div class="row mb-3">
-        <div class="col-md-6">
+        <div class="col-md-6 position-relative">
           <label class="form-label">Localisation</label>
-          <input type="text" name="location" class="form-control"
+          <input type="text" name="location" id="locationInput" class="form-control" autocomplete="off"
                  value="{{ exp.location if exp and exp.location else '' }}" placeholder="Paris, France" />
+          <ul id="locationSuggestions" class="list-group position-absolute w-100 shadow-sm"
+              style="z-index:1000;display:none;top:100%;left:0;"></ul>
         </div>
         <div class="col-md-3">
           <label class="form-label">Date de début <span class="text-danger">*</span></label>
-          <input type="date" name="date_debut" class="form-control" required
-                 value="{{ exp.date_debut.isoformat() if exp else (source.date_debut.isoformat() if source else '') }}" />
+          <input type="month" name="date_debut" class="form-control" required
+                 value="{{ exp.date_debut.strftime('%Y-%m') if exp else (source.date_debut.strftime('%Y-%m') if source else '') }}" />
         </div>
         <div class="col-md-3">
           <label class="form-label">Date de fin</label>
-          <input type="date" name="date_fin" class="form-control"
-                 value="{{ exp.date_fin.isoformat() if exp and exp.date_fin else (source.date_fin.isoformat() if source and source.date_fin else '') }}" />
+          <input type="month" name="date_fin" class="form-control"
+                 value="{{ exp.date_fin.strftime('%Y-%m') if exp and exp.date_fin else (source.date_fin.strftime('%Y-%m') if source and source.date_fin else '') }}" />
           <div class="form-text">Vide = poste actuel</div>
         </div>
       </div>
@@ -69,14 +69,11 @@
 
       <div class="mb-4">
         <label class="form-label">Description</label>
-        <!-- Quill editor visible -->
         <div id="quill-editor" style="min-height: 150px;">{{ exp.description | safe if exp and exp.description else '' }}</div>
-        <!-- Champ caché qui contiendra le HTML pour la soumission -->
         <input type="hidden" name="description" id="description-input"
                value="{{ exp.description if exp and exp.description else '' }}" />
       </div>
 
-      <!-- Sélecteur de langue pour "nouveau" -->
       {% if not source_id %}
       <div class="mb-4">
         <label class="form-label">Langue <span class="text-danger">*</span></label>
@@ -101,46 +98,83 @@
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script>
 (function() {
-  // ── Quill setup ──
+  // Quill rich text editor
   var quill = new Quill('#quill-editor', {
     theme: 'snow',
     placeholder: 'Décrivez vos missions, responsabilités...',
-    modules: {
-      toolbar: [
-        ['bold', 'italic', 'underline'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        ['clean']
-      ]
-    }
+    modules: { toolbar: [['bold','italic','underline'],[{list:'ordered'},{list:'bullet'}],['clean']] }
   });
-
-  var descInput = document.getElementById('description-input');
+  var descInput   = document.getElementById('description-input');
   var originalDesc = descInput.value;
+  var form    = document.getElementById('mainForm');
+  var saveBtn = document.getElementById('saveBtn');
 
-  // Sync Quill -> hidden input avant soumission
-  var form = document.getElementById('mainForm');
   form.addEventListener('submit', function() {
     descInput.value = quill.root.innerHTML;
     window.__formDirty = false;
   });
 
-  // ── Tracking des changements ──
-  const saveBtn = document.getElementById('saveBtn');
-  const inputs  = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
-  inputs.forEach(el => { el.dataset.original = el.value; });
+  // Tracking des changements
+  var inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
+  inputs.forEach(function(el) { el.dataset.original = el.value; });
 
   function checkChanges() {
-    const inputChanged = [...inputs].some(el => el.value !== el.dataset.original);
-    const quillChanged = quill.root.innerHTML !== originalDesc && quill.root.innerHTML !== '<p><br></p>';
-    const changed = inputChanged || (originalDesc === '' ? quillChanged : quill.root.innerHTML !== originalDesc);
+    var inputChanged = Array.from(inputs).some(function(el) { return el.value !== el.dataset.original; });
+    var quillHtml    = quill.root.innerHTML;
+    var quillChanged = quillHtml !== originalDesc && !(originalDesc === '' && quillHtml === '<p><br></p>');
+    var changed = inputChanged || quillChanged;
     saveBtn.classList.toggle('btn-primary', changed);
     saveBtn.classList.toggle('btn-outline-secondary', !changed);
-    document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.toggle('lang-unsaved', changed));
+    document.querySelectorAll('.lang-tab-btn.active').forEach(function(t) { t.classList.toggle('lang-unsaved', changed); });
     window.__formDirty = changed;
   }
-
-  inputs.forEach(el => el.addEventListener('input', checkChanges));
+  inputs.forEach(function(el) { el.addEventListener('input', checkChanges); });
   quill.on('text-change', checkChanges);
+
+  // Autocomplete localisation via Nominatim (OpenStreetMap)
+  var locInput  = document.getElementById('locationInput');
+  var locList   = document.getElementById('locationSuggestions');
+  var locTimer  = null;
+
+  locInput.addEventListener('input', function() {
+    clearTimeout(locTimer);
+    var q = locInput.value.trim();
+    if (q.length < 2) { locList.style.display = 'none'; return; }
+    locTimer = setTimeout(function() {
+      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=' + encodeURIComponent(q), {
+        headers: { 'Accept-Language': 'fr' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(results) {
+        locList.innerHTML = '';
+        var seen = new Set();
+        results.forEach(function(r) {
+          var city    = r.address.city || r.address.town || r.address.village || r.address.county || r.display_name.split(',')[0];
+          var country = r.address.country || '';
+          var label   = city.trim() + (country ? ', ' + country : '');
+          if (seen.has(label)) return;
+          seen.add(label);
+          var li = document.createElement('li');
+          li.className = 'list-group-item list-group-item-action py-1 small';
+          li.style.cursor = 'pointer';
+          li.textContent  = label;
+          li.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            locInput.value = label;
+            locList.style.display = 'none';
+            checkChanges();
+          });
+          locList.appendChild(li);
+        });
+        locList.style.display = locList.children.length ? 'block' : 'none';
+      })
+      .catch(function() { locList.style.display = 'none'; });
+    }, 400);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!locList.contains(e.target) && e.target !== locInput) locList.style.display = 'none';
+  });
 })();
 </script>
 {{ unsaved_guard("mainForm") }}

@@ -17,24 +17,27 @@
 <div class="card mb-3 shadow-sm">
   <div class="card-body">
     <div class="d-flex justify-content-between">
-      <div>
+      <div class="flex-grow-1 me-3">
         <h5 class="mb-1">{{ exp.titre_poste }}</h5>
         <p class="mb-1 text-muted">
           <i class="bi bi-building"></i> {{ exp.entreprise }}
-          {% if exp.location %} &nbsp;·&nbsp; <i class="bi bi-geo-alt"></i> {{ exp.location }}{% endif %}
+          {% if exp.location %} &nbsp;&middot;&nbsp; <i class="bi bi-geo-alt"></i> {{ exp.location }}{% endif %}
         </p>
         <small class="text-muted">
-          {{ exp.date_debut.strftime('%m/%Y') }} →
+          {{ exp.date_debut.strftime('%m/%Y') }}
+          &rarr;
           {% if exp.date_fin %}{{ exp.date_fin.strftime('%m/%Y') }}{% else %}Présent{% endif %}
+          &nbsp;&middot;&nbsp;
+          <span class="badge bg-secondary">{{ exp | exp_duration }}</span>
         </small>
         {% if exp.project_summary %}
         <p class="mt-2 mb-1"><strong>Projet :</strong> {{ exp.project_summary }}</p>
         {% endif %}
         {% if exp.description %}
-        <p class="mt-1 mb-0 text-muted">{{ exp.description[:150] }}{% if exp.description|length > 150 %}...{% endif %}</p>
+        <div class="mt-2 mb-0 exp-description-preview">{{ exp.description | safe }}</div>
         {% endif %}
       </div>
-      <div class="d-flex flex-column gap-2 ms-3">
+      <div class="d-flex flex-column gap-2 ms-3 flex-shrink-0">
         <a href="/experiences/{{ exp.id }}/edit" class="btn btn-outline-primary btn-sm">
           <i class="bi bi-pencil"></i>
         </a>

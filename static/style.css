@@ -120,3 +120,15 @@ main.container {
 .btn-save {
   transition: all 0.2s;
 }
+
+/* ── Description preview (liste expériences) ── */
+.exp-description-preview {
+  font-size: .875rem;
+  color: #6c757d;
+  max-height: 80px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+.exp-description-preview p { margin-bottom: .25rem; }
+.exp-description-preview ul, .exp-description-preview ol { padding-left: 1.2rem; margin-bottom: .25rem; }
