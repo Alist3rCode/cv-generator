@@ -113,13 +113,20 @@ class User(AuditMixin, Base):
     # Relations
     user_organisations = relationship("UserOrganisation", back_populates="user",
                                       foreign_keys="UserOrganisation.user_id")
-    profile            = relationship("Profile",          back_populates="user", uselist=False)
-    bios               = relationship("Bio",              back_populates="user")
-    experiences        = relationship("Experience",       back_populates="user")
-    formations         = relationship("Formation",        back_populates="user")
-    certifications     = relationship("Certification",    back_populates="user")
-    competences        = relationship("Competence",       back_populates="user")
-    cv_exports         = relationship("CVExport",         back_populates="user")
+    profile            = relationship("Profile",          back_populates="user", uselist=False,
+                                      foreign_keys="Profile.user_id")
+    bios               = relationship("Bio",              back_populates="user",
+                                      foreign_keys="Bio.user_id")
+    experiences        = relationship("Experience",       back_populates="user",
+                                      foreign_keys="Experience.user_id")
+    formations         = relationship("Formation",        back_populates="user",
+                                      foreign_keys="Formation.user_id")
+    certifications     = relationship("Certification",    back_populates="user",
+                                      foreign_keys="Certification.user_id")
+    competences        = relationship("Competence",       back_populates="user",
+                                      foreign_keys="Competence.user_id")
+    cv_exports         = relationship("CVExport",         back_populates="user",
+                                      foreign_keys="CVExport.user_id")
 
 
 class UserOrganisation(AuditMixin, Base):
@@ -155,7 +162,7 @@ class Profile(AuditMixin, Base):
     linkedin_url = Column(String(500), nullable=True)
 
     # Relations
-    user = relationship("User", back_populates="profile")
+    user = relationship("User", back_populates="profile", foreign_keys=[user_id])
 
 
 # ──────────────────────────────────────────────
@@ -191,7 +198,7 @@ class Bio(AuditMixin, Base):
     texte       = Column(Text, nullable=False)
 
     # Relations
-    user     = relationship("User",     back_populates="bios")
+    user     = relationship("User",     back_populates="bios",     foreign_keys=[user_id])
     language = relationship("Language", back_populates="bios")
 
 
@@ -220,7 +227,7 @@ class Experience(TranslatableMixin, AuditMixin, Base):
     soft_skills     = Column(JSON,        nullable=True)   # ["gid-uuid-3", ...]
 
     # Relations
-    user     = relationship("User",     back_populates="experiences")
+    user     = relationship("User",     back_populates="experiences", foreign_keys=[user_id])
     language = relationship("Language", back_populates="experiences")
 
 
@@ -240,7 +247,7 @@ class Formation(TranslatableMixin, AuditMixin, Base):
     description    = Column(Text,        nullable=True)
 
     # Relations
-    user     = relationship("User",     back_populates="formations")
+    user     = relationship("User",     back_populates="formations", foreign_keys=[user_id])
     language = relationship("Language", back_populates="formations")
 
 
@@ -259,7 +266,7 @@ class Certification(TranslatableMixin, AuditMixin, Base):
     date_fin        = Column(Date,        nullable=True)   # NULL = pas d'expiration
 
     # Relations
-    user     = relationship("User",     back_populates="certifications")
+    user     = relationship("User",     back_populates="certifications", foreign_keys=[user_id])
     language = relationship("Language", back_populates="certifications")
 
 
@@ -280,7 +287,7 @@ class Competence(TranslatableMixin, AuditMixin, Base):
     niveau  = Column(Enum(SkillLevelEnum), nullable=False)
 
     # Relations
-    user     = relationship("User",     back_populates="competences")
+    user     = relationship("User",     back_populates="competences", foreign_keys=[user_id])
     language = relationship("Language", back_populates="competences")
 
 
@@ -327,6 +334,6 @@ class CVExport(AuditMixin, Base):
     generated_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relations
-    user     = relationship("User",     back_populates="cv_exports")
+    user     = relationship("User",     back_populates="cv_exports", foreign_keys=[user_id])
     template = relationship("Template", back_populates="cv_exports")
     language = relationship("Language", back_populates="cv_exports")
