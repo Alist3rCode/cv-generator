@@ -32,6 +32,8 @@ def _dedup_by_gid(items):
 def list_formations(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     all_items = db.query(Formation).filter(Formation.user_id == current_user.id).order_by(Formation.date_debut.desc()).all()
     formations = _dedup_by_gid(all_items)
+    if not formations:
+        return RedirectResponse(url="/formations/new", status_code=302)
     languages  = db.query(Language).all()
     langs_by_gid = {}
     for f in all_items:

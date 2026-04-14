@@ -1,4 +1,4 @@
-{% from "macros.html" import lang_tabs %}
+{% from "macros.html" import lang_tabs, unsaved_guard %}
 {% extends "base.html" %}
 {% block title %}Mon profil — CV Generator{% endblock %}
 
@@ -89,13 +89,16 @@
       saveBtn.classList.replace('btn-outline-secondary', 'btn-primary');
       // Marquer l'onglet actif comme non sauvegardé
       document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.add('lang-unsaved'));
+    window.__formDirty = true;
     } else {
       saveBtn.classList.replace('btn-primary', 'btn-outline-secondary');
       document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.remove('lang-unsaved'));
+    window.__formDirty = false;
     }
   }
 
   inputs.forEach(el => el.addEventListener('input', checkChanges));
 })();
 </script>
+{{ unsaved_guard("profileForm") }}
 {% endblock %}

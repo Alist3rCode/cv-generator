@@ -32,6 +32,8 @@ def _dedup_by_gid(items):
 def list_certifications(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     all_items = db.query(Certification).filter(Certification.user_id == current_user.id).order_by(Certification.date_obtention.desc()).all()
     certs     = _dedup_by_gid(all_items)
+    if not certs:
+        return RedirectResponse(url="/certifications/new", status_code=302)
     languages = db.query(Language).all()
     langs_by_gid = {}
     for c in all_items:

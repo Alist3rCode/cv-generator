@@ -1,4 +1,4 @@
-{% from "macros.html" import lang_tabs %}
+{% from "macros.html" import lang_tabs, unsaved_guard %}
 {% extends "base.html" %}
 {% block title %}{% if source_id %}Modifier{% else %}Ajouter{% endif %} une compétence{% endblock %}
 
@@ -77,9 +77,11 @@
     const changed = [...inputs].some(el => el.value !== el.dataset.original);
     saveBtn.classList.toggle('btn-primary', changed);
     saveBtn.classList.toggle('btn-outline-secondary', !changed);
+    window.__formDirty = changed;
     document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.toggle('lang-unsaved', changed));
   }
   inputs.forEach(el => el.addEventListener('input', checkChanges));
 })();
 </script>
+{{ unsaved_guard("mainForm") }}
 {% endblock %}

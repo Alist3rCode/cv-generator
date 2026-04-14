@@ -33,6 +33,8 @@ def _dedup_by_gid(items):
 def list_experiences(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     all_exps  = db.query(Experience).filter(Experience.user_id == current_user.id).order_by(Experience.date_debut.desc()).all()
     experiences = _dedup_by_gid(all_exps)
+    if not experiences:
+        return RedirectResponse(url="/experiences/new", status_code=302)
     languages   = db.query(Language).all()
     # Langues disponibles par GID
     langs_by_gid = {}

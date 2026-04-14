@@ -1,6 +1,11 @@
-{% from "macros.html" import lang_tabs %}
+{% from "macros.html" import lang_tabs, unsaved_guard %}
 {% extends "base.html" %}
 {% block title %}{% if source_id %}Modifier{% else %}Ajouter{% endif %} une expérience{% endblock %}
+
+{% block head_extra %}
+<!-- Quill rich text editor -->
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+{% endblock %}
 
 {% block content %}
 <h3 class="mb-4">
@@ -64,7 +69,11 @@
 
       <div class="mb-4">
         <label class="form-label">Description</label>
-        <textarea name="description" class="form-control" rows="4">{{ exp.description if exp and exp.description else '' }}</textarea>
+        <!-- Quill editor visible -->
+        <div id="quill-editor" style="min-height: 150px;">{{ exp.description | safe if exp and exp.description else '' }}</div>
+        <!-- Champ caché qui contiendra le HTML pour la soumission -->
+        <input type="hidden" name="description" id="description-input"
+               value="{{ exp.description if exp and exp.description else '' }}" />
       </div>
 
       <!-- Sélecteur de langue pour "nouveau" -->
@@ -89,20 +98,50 @@
   </div>
 </div>
 
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script>
 (function() {
-  const form    = document.getElementById('mainForm');
+  // ── Quill setup ──
+  var quill = new Quill('#quill-editor', {
+    theme: 'snow',
+    placeholder: 'Décrivez vos missions, responsabilités...',
+    modules: {
+      toolbar: [
+        ['bold', 'italic', 'underline'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['clean']
+      ]
+    }
+  });
+
+  var descInput = document.getElementById('description-input');
+  var originalDesc = descInput.value;
+
+  // Sync Quill -> hidden input avant soumission
+  var form = document.getElementById('mainForm');
+  form.addEventListener('submit', function() {
+    descInput.value = quill.root.innerHTML;
+    window.__formDirty = false;
+  });
+
+  // ── Tracking des changements ──
   const saveBtn = document.getElementById('saveBtn');
-  if (!form || !saveBtn) return;
-  const inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
+  const inputs  = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
   inputs.forEach(el => { el.dataset.original = el.value; });
+
   function checkChanges() {
-    const changed = [...inputs].some(el => el.value !== el.dataset.original);
+    const inputChanged = [...inputs].some(el => el.value !== el.dataset.original);
+    const quillChanged = quill.root.innerHTML !== originalDesc && quill.root.innerHTML !== '<p><br></p>';
+    const changed = inputChanged || (originalDesc === '' ? quillChanged : quill.root.innerHTML !== originalDesc);
     saveBtn.classList.toggle('btn-primary', changed);
     saveBtn.classList.toggle('btn-outline-secondary', !changed);
     document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.toggle('lang-unsaved', changed));
+    window.__formDirty = changed;
   }
+
   inputs.forEach(el => el.addEventListener('input', checkChanges));
+  quill.on('text-change', checkChanges);
 })();
 </script>
+{{ unsaved_guard("mainForm") }}
 {% endblock %}

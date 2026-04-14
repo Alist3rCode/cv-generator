@@ -108,22 +108,30 @@ def edit_profile(
         db.add(profile)
 
     # Sauvegarder la bio pour la langue active
-    if bio_texte is not None and language_id:
-        lang_uuid = uuid.UUID(language_id)
-        bio = db.query(Bio).filter(
-            Bio.user_id == current_user.id,
-            Bio.language_id == lang_uuid,
-        ).first()
-        if bio:
-            bio.texte = bio_texte
-        elif bio_texte.strip():
-            bio = Bio(
-                id=uuid.uuid4(),
-                user_id=current_user.id,
-                language_id=lang_uuid,
-                texte=bio_texte,
-            )
-            db.add(bio)
+    lang_id_str = (language_id or "").strip()
+    if bio_texte is not None and lang_id_str:
+        try:
+            lang_uuid = uuid.UUID(lang_id_str)
+        except ValueError:
+            lang_uuid = None
+        if lang_uuid:
+            bio = db.query(Bio).filter(
+                Bio.user_id == current_user.id,
+                Bio.language_id == lang_uuid,
+            ).first()
+            if bio:
+                if bio_texte.strip():
+                    bio.texte = bio_texte
+                else:
+                    db.delete(bio)
+            elif bio_texte.strip():
+                bio = Bio(
+                    id=uuid.uuid4(),
+                    user_id=current_user.id,
+                    language_id=lang_uuid,
+                    texte=bio_texte,
+                )
+                db.add(bio)
 
     db.commit()
     redirect_lang = f"?language_id={language_id}" if language_id else ""

@@ -15,8 +15,41 @@
        class="lang-tab-btn {% if is_active %}active{% endif %} {% if not has_data and not is_active %}lang-missing{% endif %}"
        title="{{ lang.nom }}"
        data-lang-id="{{ lang.id }}">
-      <img src="https://flagcdn.com/24x18/{{ lang.code }}.png" alt="{{ lang.nom }}" width="24" height="18" />
+      <img src="https://flagcdn.com/{{ lang.code }}.svg" alt="{{ lang.nom }}" width="28" height="20" />
     </a>
   {% endfor %}
 </div>
+{% endmacro %}
+
+{% macro unsaved_guard(form_id="mainForm") %}
+{#
+  Ajoute une alerte navigateur si l'utilisateur tente de quitter la page
+  avec des modifications non sauvegardées.
+  Doit être appelé APRÈS le script de tracking des changements du formulaire.
+  Le script de tracking doit mettre à jour window.__formDirty = true/false.
+#}
+<script>
+(function() {
+  window.__formDirty = false;
+  window.addEventListener('beforeunload', function(e) {
+    if (window.__formDirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+  // Marquer comme "propre" quand le formulaire est soumis
+  var form = document.getElementById('{{ form_id }}');
+  if (form) {
+    form.addEventListener('submit', function() {
+      window.__formDirty = false;
+    });
+  }
+  // Marquer comme "propre" quand on clique sur un onglet de langue (navigation voulue)
+  document.querySelectorAll('.lang-tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      window.__formDirty = false;
+    });
+  });
+})();
+</script>
 {% endmacro %}
