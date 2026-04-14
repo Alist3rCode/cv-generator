@@ -4,15 +4,17 @@ Application web de génération de CV, développée avec **FastAPI** et **SQLite
 
 ## Fonctionnalités
 
-- **Authentification** — Connexion / inscription sécurisée (JWT)
-- **Gestion du profil** — Saisie et modification des informations personnelles
-- **Expériences professionnelles** — Ajout, modification, suppression
+- **Authentification** — Connexion / inscription sécurisée (JWT, cookie httponly)
+- **Gestion du profil** — Téléphone, LinkedIn, bio multi-langue
+- **Expériences professionnelles** — Éditeur de texte riche (Quill), dates MM/YYYY, durée calculée, autocomplete localisation
 - **Formations** — Diplômes et établissements
 - **Certifications** — Avec dates d'obtention et d'expiration
-- **Compétences** — Hard skills et soft skills avec niveau (1 à 4)
-- **Import de template Word** — L'admin importe un `.docx` avec des balises
+**Compétences** — Hard skills et soft skills avec niveau (1 à 4)
+- **Import de template Word** — L'admin importe un `.docx` avec des balises `{{BALISE}}`
 - **Export CV** — Génération en `.docx` ou `.pdf` à partir du template
-- **Multi-langue** — Architecture prête pour le support multi-langue (traduction à venir)
+- **Multi-langue** — 5 langues par défaut (FR 🇫🇷, EN 🇬🇧, ES 🇪🇸, IT 🇮🇹, DE 🇩🇪), drapeaux interactifs sur tous les formulaires
+- **Dashboard** — Donut de complétion, résumé complet du CV (bio, certifs, formations, expériences)
+- **Thème clair / sombre** — Détecte automatiquement la préférence système, toggle dans la navbar
 - **Rôles** — Utilisateur standard / Administrateur par organisation
 
 ## Stack technique
@@ -21,10 +23,14 @@ Application web de génération de CV, développée avec **FastAPI** et **SQLite
 |-----------|-------------|
 | Backend | [FastAPI](https://fastapi.tiangolo.com/) |
 | ORM | [SQLAlchemy 2.0](https://www.sqlalchemy.org/) |
-| Base de données | SQLite (développement) |
+| Base de données | SQLite |
 | Schémas | [Pydantic v2](https://docs.pydantic.dev/) |
 | Auth | JWT via `python-jose` + `passlib` |
-| Templates HTML | Jinja2 + Bootstrap 5 |
+| Templates HTML | Jinja2 + Bootstrap 5.3 |
+| Éditeur riche | [Quill.js](https://quilljs.com/) (CDN) |
+| Graphique | [Chart.js](https://www.chartjs.org/) (CDN) |
+| Drapeaux | [flagcdn.com](https://flagcdn.com) (SVG) |
+| Autocomplete | [Nominatim / OpenStreetMap](https://nominatim.org/) |
 | Génération DOCX | `python-docx` |
 | Export PDF | WeasyPrint |
 
@@ -32,7 +38,7 @@ Application web de génération de CV, développée avec **FastAPI** et **SQLite
 
 ### Prérequis
 
-- Python **3.12** (requis — Python 3.14 non supporté par certaines dépendances)
+- **Python 3.12** (requis — Python 3.14 non supporté par `pydantic-core`)
 - pip
 
 ### Étapes
@@ -44,42 +50,43 @@ cd cv-generator
 
 # 2. Installer les dépendances
 py -3.12 -m pip install -r requirements.txt
-py -3.12 -m pip install "bcrypt==4.0.1"
 
-# 3. Initialiser la base de données et créer les données initiales
+# 3. (Optionnel) Créer un compte admin de démo
 py -3.12 seed.py
 
 # 4. Lancer l'application
-py -3.12 -m uvicorn main:app --reload
+py -3.12 -m uvicorn main:app --reload --port 9000
 ```
 
-L'application est accessible sur **http://localhost:8000**
+L'application est accessible sur **http://localhost:9000**
 
-### Compte admin par défaut
+> Les 5 langues par défaut (fr, gb, es, it, de) sont créées automatiquement au premier démarrage.
+
+### Compte admin de démo (après `seed.py`)
 
 | Champ | Valeur |
 |-------|--------|
 | Email | `admin@example.com` |
 | Mot de passe | `admin1234` |
 
-> Pensez à changer ce mot de passe en production !
+> **Important :** Changez ce mot de passe avant toute utilisation en production.
 
 ## Structure du projet
 
 ```
 cv-generator/
-├── main.py                  # Point d'entrée FastAPI
-├── models.py                # Modèles SQLAlchemy (BDD)
-├── schemas.py               # Schémas Pydantic (validation)
+├── main.py                  # Point d'entrée FastAPI + filtres Jinja2
+├── models.py                # Modèles SQLAlchemy
+├── schemas.py               # Schémas Pydantic
 ├── database.py              # Configuration SQLite
 ├── seed.py                  # Données initiales (admin + langues)
 ├── requirements.txt
 │
-├── routers/                 # Endpoints par domaine
+├── routers/
 │   ├── auth.py              # Login / logout / JWT
 │   ├── users.py             # Inscription, liste utilisateurs
-│   ├── profile.py           # Dashboard + profil personnel
-│   ├── experiences.py       # CRUD expériences
+│   ├── profile.py           # Dashboard + profil + bio multi-langue
+│   ├── experiences.py       # CRUD expériences (multi-langue via GID)
 │   ├── formations.py        # CRUD formations
 │   ├── certifications.py    # CRUD certifications
 │   ├── competences.py       # CRUD compétences
@@ -89,15 +96,15 @@ cv-generator/
 ├── services/
 │   └── cv_generator.py      # Moteur de génération DOCX/PDF
 │
-├── templates/               # Pages HTML (Jinja2 + Bootstrap 5)
-│   ├── base.html
+├── templates/
+│   ├── base.html            # Layout principal (navbar, dark mode)
+│   ├── macros.html          # Macros Jinja2 (lang_tabs, unsaved_guard)
 │   ├── auth/
-│   ├── profile/
+│   ├── profile/             # dashboard.html, edit.html
 │   ├── experiences/
 │   ├── formations/
 │   ├── certifications/
 │   ├── competences/
-│   ├── admin/
 │   └── exports/
 │
 ├── static/
@@ -107,11 +114,30 @@ cv-generator/
 └── exports/                 # CV générés (ignoré par git)
 ```
 
+## Architecture multi-langue
+
+Tous les contenus traduisibles (expériences, formations, certifications, compétences) utilisent un **GID (Group ID)** — un UUID partagé entre toutes les traductions d'une même entrée.
+
+- La liste affiche une entrée par GID (langue principale)
+- En mode édition, des **onglets drapeaux** permettent de basculer entre les langues
+- Un onglet clignote si des modifications ne sont pas encore sauvegardées
+
+La **bio** est par utilisateur × langue (pas de GID).
+
+## Comportements UX
+
+| Fonctionnalité | Description |
+|---|---|
+| Bouton Enregistrer | Passe en bleu (`btn-primary`) si le formulaire a des modifications non sauvegardées |
+| Alerte quitter | Pop-up navigateur si vous tentez de quitter une page avec des modifications non sauvegardées |
+| Page vide | Expériences / formations / certifications / compétences vides redirigent directement vers le formulaire d'ajout |
+| Thème | Détecte la préférence système (clair/sombre), modifiable via le menu utilisateur, mémorisé dans `localStorage` |
+
 ## Utilisation des templates Word
 
-Pour créer un template CV, créez un fichier `.docx` avec les balises suivantes :
+Créez un fichier `.docx` avec les balises suivantes :
 
-### Balises simples (texte)
+### Balises simples
 
 | Balise | Description |
 |--------|-------------|
@@ -124,27 +150,25 @@ Pour créer un template CV, créez un fichier `.docx` avec les balises suivantes
 
 ### Sections répétées (tableaux Word)
 
-Créez un tableau avec **une ligne modèle** contenant les balises — l'application dupliquera cette ligne pour chaque entrée.
+Créez un tableau avec une **ligne modèle** — l'application la duplique pour chaque entrée.
 
-**Expériences :**
-`{{EXP_TITRE}}` `{{EXP_ENTREPRISE}}` `{{EXP_LOCATION}}` `{{EXP_DEBUT}}` `{{EXP_FIN}}` `{{EXP_SUMMARY}}` `{{EXP_DESC}}`
+**Expériences :** `{{EXP_TITRE}}` `{{EXP_ENTREPRISE}}` `{{EXP_LOCATION}}` `{{EXP_DEBUT}}` `{{EXP_FIN}}` `{{EXP_DUREE}}` `{{EXP_SUMMARY}}` `{{EXP_DESC}}`
 
-**Formations :**
-`{{FORM_DIPLOME}}` `{{FORM_ETAB}}` `{{FORM_DEBUT}}` `{{FORM_FIN}}`
+**Formations :** `{{FORM_DIPLOME}}` `{{FORM_ETAB}}` `{{FORM_DEBUT}}` `{{FORM_FIN}}`
 
-**Certifications :**
-`{{CERT_TITRE}}` `{{CERT_ORG}}` `{{CERT_DATE}}` `{{CERT_FIN}}`
+**Certifications :** `{{CERT_TITRE}}` `{{CERT_ORG}}` `{{CERT_DATE}}` `{{CERT_FIN}}`
 
-**Compétences :**
-`{{HARD_NOM}}` `{{HARD_NIVEAU}}` · `{{SOFT_NOM}}` `{{SOFT_NIVEAU}}`
+**Compétences :** `{{HARD_NOM}}` `{{HARD_NIVEAU}}` · `{{SOFT_NOM}}` `{{SOFT_NIVEAU}}`
 
 ## Roadmap
 
 - [ ] Import de CV existant (PDF / Word) via IA
-- [ ] Traduction automatique des champs via IA
+- [ ] Import depuis l'export LinkedIn (ZIP)
+- [ ] Traduction automatique des champs
 - [ ] Gestion admin des utilisateurs d'une organisation
 - [ ] Aperçu CV avant export
 - [ ] Support photo de profil
+- [ ] Éditeur riche pour les descriptions de formations
 
 ## Licence
 

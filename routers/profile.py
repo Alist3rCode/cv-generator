@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User, Profile, Language, Bio, Experience, Formation, Competence
+from models import User, Profile, Language, Bio, Experience, Formation, Competence, Certification
 from routers.auth import require_user
 
 router = APIRouter(tags=["profile"])
@@ -33,11 +33,39 @@ def compute_completion(user_id, db: Session) -> tuple[int, dict]:
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     completion, criteria = compute_completion(current_user.id, db)
+
+    # Donnees pour le resume CV
+    languages     = db.query(Language).all()
+    default_lang  = languages[0] if languages else None
+
+    bio = None
+    if default_lang:
+        bio = db.query(Bio).filter(
+            Bio.user_id == current_user.id,
+            Bio.language_id == default_lang.id,
+        ).first()
+
+    all_exps   = db.query(Experience).filter(Experience.user_id == current_user.id).order_by(Experience.date_debut.desc()).all()
+    all_forms  = db.query(Formation).filter(Formation.user_id == current_user.id).order_by(Formation.date_debut.desc()).all()
+    all_certs  = db.query(Certification).filter(Certification.user_id == current_user.id).order_by(Certification.date_obtention.desc()).all()
+
+    def _dedup(items):
+        seen, result = set(), []
+        for item in items:
+            if item.gid not in seen:
+                seen.add(item.gid)
+                result.append(item)
+        return result
+
     return templates.TemplateResponse("profile/dashboard.html", {
-        "request":     request,
+        "request":      request,
         "current_user": current_user,
-        "completion":  completion,
-        "criteria":    criteria,
+        "completion":   completion,
+        "criteria":     criteria,
+        "bio":          bio,
+        "experiences":  _dedup(all_exps),
+        "formations":   _dedup(all_forms),
+        "certifications": _dedup(all_certs),
     })
 
 
