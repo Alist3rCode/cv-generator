@@ -16,6 +16,12 @@ from models import User, Formation, Language
 from routers.auth import require_user
 
 router = APIRouter(prefix="/formations", tags=["formations"])
+
+def _parse_date(value):
+    """Convertit une chaine ISO en date, retourne None si vide."""
+    from datetime import date as _date
+    return _date.fromisoformat(value) if value and value.strip() else None
+
 templates = Jinja2Templates(directory="templates")
 
 
@@ -59,8 +65,8 @@ def new_formation_page(request: Request, db: Session = Depends(get_db), current_
 def create_formation(
     diplome: str              = Form(...),
     etablissement: str        = Form(...),
-    date_debut: date          = Form(...),
-    date_fin: Optional[date]  = Form(None),
+    date_debut: str           = Form(...),
+    date_fin: Optional[str]   = Form(None),
     description: Optional[str] = Form(None),
     language_id: str          = Form(...),
     db: Session               = Depends(get_db),
@@ -69,8 +75,8 @@ def create_formation(
     db.add(Formation(
         id=uuid.uuid4(), gid=uuid.uuid4(), user_id=current_user.id,
         language_id=uuid.UUID(language_id), diplome=diplome,
-        etablissement=etablissement, date_debut=date_debut,
-        date_fin=date_fin, description=description or None,
+        etablissement=etablissement, date_debut=_parse_date(date_debut),
+        date_fin=_parse_date(date_fin), description=description or None,
     ))
     db.commit()
     return RedirectResponse(url="/formations/", status_code=303)
@@ -111,8 +117,8 @@ def update_formation(
     fid: str,
     diplome: str              = Form(...),
     etablissement: str        = Form(...),
-    date_debut: date          = Form(...),
-    date_fin: Optional[date]  = Form(None),
+    date_debut: str           = Form(...),
+    date_fin: Optional[str]   = Form(None),
     description: Optional[str] = Form(None),
     language_id: str          = Form(...),
     db: Session               = Depends(get_db),
@@ -132,13 +138,13 @@ def update_formation(
 
     if existing:
         existing.diplome = diplome; existing.etablissement = etablissement
-        existing.date_debut = date_debut; existing.date_fin = date_fin
+        existing.date_debut = _parse_date(date_debut); existing.date_fin = _parse_date(date_fin)
         existing.description = description or None
     else:
         db.add(Formation(
             id=uuid.uuid4(), gid=source.gid, user_id=current_user.id,
             language_id=lang_uuid, diplome=diplome, etablissement=etablissement,
-            date_debut=date_debut, date_fin=date_fin, description=description or None,
+            date_debut=_parse_date(date_debut), date_fin=_parse_date(date_fin), description=description or None,
         ))
     db.commit()
     return RedirectResponse(url=f"/formations/{fid}/edit?language_id={language_id}", status_code=303)

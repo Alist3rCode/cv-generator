@@ -16,6 +16,12 @@ from models import User, Experience, Language
 from routers.auth import require_user
 
 router = APIRouter(prefix="/experiences", tags=["experiences"])
+
+def _parse_date(value):
+    """Convertit une chaine ISO en date, retourne None si vide."""
+    from datetime import date as _date
+    return _date.fromisoformat(value) if value and value.strip() else None
+
 templates = Jinja2Templates(directory="templates")
 
 
@@ -64,8 +70,8 @@ def create_experience(
     titre_poste: str          = Form(...),
     entreprise: str           = Form(...),
     location: Optional[str]   = Form(None),
-    date_debut: date          = Form(...),
-    date_fin: Optional[date]  = Form(None),
+    date_debut: str           = Form(...),
+    date_fin: Optional[str]   = Form(None),
     project_summary: Optional[str] = Form(None),
     description: Optional[str]    = Form(None),
     language_id: str          = Form(...),
@@ -76,7 +82,7 @@ def create_experience(
         id=uuid.uuid4(), gid=uuid.uuid4(), user_id=current_user.id,
         language_id=uuid.UUID(language_id),
         titre_poste=titre_poste, entreprise=entreprise,
-        location=location or None, date_debut=date_debut, date_fin=date_fin,
+        location=location or None, date_debut=_parse_date(date_debut), date_fin=_parse_date(date_fin),
         project_summary=project_summary or None, description=description or None,
     )
     db.add(exp)
@@ -124,8 +130,8 @@ def update_experience(
     titre_poste: str          = Form(...),
     entreprise: str           = Form(...),
     location: Optional[str]   = Form(None),
-    date_debut: date          = Form(...),
-    date_fin: Optional[date]  = Form(None),
+    date_debut: str           = Form(...),
+    date_fin: Optional[str]   = Form(None),
     project_summary: Optional[str] = Form(None),
     description: Optional[str]    = Form(None),
     language_id: str          = Form(...),
@@ -146,14 +152,14 @@ def update_experience(
 
     if existing:
         existing.titre_poste = titre_poste; existing.entreprise = entreprise
-        existing.location = location or None; existing.date_debut = date_debut
-        existing.date_fin = date_fin; existing.project_summary = project_summary or None
+        existing.location = location or None; existing.date_debut = _parse_date(date_debut)
+        existing.date_fin = _parse_date(date_fin); existing.project_summary = project_summary or None
         existing.description = description or None
     else:
         db.add(Experience(
             id=uuid.uuid4(), gid=source.gid, user_id=current_user.id,
             language_id=lang_uuid, titre_poste=titre_poste, entreprise=entreprise,
-            location=location or None, date_debut=date_debut, date_fin=date_fin,
+            location=location or None, date_debut=_parse_date(date_debut), date_fin=_parse_date(date_fin),
             project_summary=project_summary or None, description=description or None,
         ))
     db.commit()

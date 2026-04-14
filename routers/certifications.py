@@ -16,6 +16,12 @@ from models import User, Certification, Language
 from routers.auth import require_user
 
 router = APIRouter(prefix="/certifications", tags=["certifications"])
+
+def _parse_date(value):
+    """Convertit une chaine ISO en date, retourne None si vide."""
+    from datetime import date as _date
+    return _date.fromisoformat(value) if value and value.strip() else None
+
 templates = Jinja2Templates(directory="templates")
 
 
@@ -59,8 +65,8 @@ def new_certification_page(request: Request, db: Session = Depends(get_db), curr
 def create_certification(
     titre: str                = Form(...),
     organisme: str            = Form(...),
-    date_obtention: date      = Form(...),
-    date_fin: Optional[date]  = Form(None),
+    date_obtention: str       = Form(...),
+    date_fin: Optional[str]   = Form(None),
     language_id: str          = Form(...),
     db: Session               = Depends(get_db),
     current_user: User        = Depends(require_user),
@@ -68,7 +74,7 @@ def create_certification(
     db.add(Certification(
         id=uuid.uuid4(), gid=uuid.uuid4(), user_id=current_user.id,
         language_id=uuid.UUID(language_id), titre=titre,
-        organisme=organisme, date_obtention=date_obtention, date_fin=date_fin,
+        organisme=organisme, date_obtention=_parse_date(date_obtention), date_fin=_parse_date(date_fin),
     ))
     db.commit()
     return RedirectResponse(url="/certifications/", status_code=303)
@@ -109,8 +115,8 @@ def update_certification(
     cid: str,
     titre: str                = Form(...),
     organisme: str            = Form(...),
-    date_obtention: date      = Form(...),
-    date_fin: Optional[date]  = Form(None),
+    date_obtention: str       = Form(...),
+    date_fin: Optional[str]   = Form(None),
     language_id: str          = Form(...),
     db: Session               = Depends(get_db),
     current_user: User        = Depends(require_user),
@@ -129,12 +135,12 @@ def update_certification(
 
     if existing:
         existing.titre = titre; existing.organisme = organisme
-        existing.date_obtention = date_obtention; existing.date_fin = date_fin
+        existing.date_obtention = _parse_date(date_obtention); existing.date_fin = _parse_date(date_fin)
     else:
         db.add(Certification(
             id=uuid.uuid4(), gid=source.gid, user_id=current_user.id,
             language_id=lang_uuid, titre=titre, organisme=organisme,
-            date_obtention=date_obtention, date_fin=date_fin,
+            date_obtention=_parse_date(date_obtention), date_fin=_parse_date(date_fin),
         ))
     db.commit()
     return RedirectResponse(url=f"/certifications/{cid}/edit?language_id={language_id}", status_code=303)
