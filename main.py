@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from database import init_db
-from routers import auth, users, profile, experiences, formations, certifications, competences, templates, exports
+from routers import auth, users, profile, experiences, formations, certifications, competences, templates, exports, admin
 
 app = FastAPI(title="CV Generator", version="1.0.0")
 
@@ -57,6 +57,7 @@ app.include_router(certifications.router)
 app.include_router(competences.router)
 app.include_router(templates.router)
 app.include_router(exports.router)
+app.include_router(admin.router)
 
 
 @app.on_event("startup")
