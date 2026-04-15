@@ -259,20 +259,18 @@
 
   function makeChip(skill, side) {
     var chip = document.createElement('span');
-    chip.className = 'badge rounded-pill border picker-chip user-select-none';
-    chip.style.cursor = 'pointer';
-    chip.style.fontSize = '0.82rem';
+    chip.className = 'picker-chip user-select-none';
+    chip.style.cssText = 'cursor:pointer;display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.82rem;';
     chip.dataset.gid = skill.gid;
     chip.dataset.side = side;
-    chip.innerHTML = '<span class="me-1">' + skill.nom + '</span>' + levelDots(skill.niveau, skill.type || 'hard');
+    chip.textContent = skill.nom;
 
-    // Couleur selon côté
     if (side === 'assigned') {
-      chip.classList.add('bg-primary', 'text-white', 'border-primary');
+      chip.style.background = 'var(--bs-primary-bg-subtle)';
+      chip.style.color      = 'var(--bs-primary-text-emphasis)';
     } else {
-      chip.classList.add('border-secondary');
       chip.style.background = 'var(--bs-secondary-bg)';
-      chip.style.color      = 'var(--bs-body-color)';
+      chip.style.color      = 'var(--bs-secondary-color)';
     }
 
     chip.addEventListener('click', function(e) {
@@ -281,7 +279,6 @@
       var isSelected = selectedGids.has(gid);
       if (isSelected) {
         selectedGids.delete(gid);
-        chip.classList.remove('opacity-75', 'border-warning');
         chip.style.outline = '';
       } else {
         selectedGids.add(gid);
