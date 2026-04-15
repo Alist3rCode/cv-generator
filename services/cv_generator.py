@@ -164,28 +164,40 @@ def _expand_table_section(doc: Document, marker: str, items: list[dict[str, str]
     """
     Trouve la table contenant `marker`, clone la ligne modèle pour chaque item
     et supprime la ligne modèle originale.
+
+    Important : on calcule la position d'insertion parmi TOUS les enfants XML
+    du <w:tbl> (pas seulement les <w:tr>), car le tbl contient aussi w:tblPr,
+    w:tblGrid, etc. en tête — un index basé sur w:tr seuls décalerait les
+    insertions et corromprait le fichier.
     """
+    from docx.table import _Row
+
     for table in doc.tables:
         template_row = _find_template_row(table, marker)
         if template_row is None:
             continue
 
-        # Index de la ligne modèle dans le tableau
-        tr_list = table._tbl.findall(qn("w:tr"))
-        row_index = tr_list.index(template_row._tr)
+        tbl = table._tbl
+        tr_el = template_row._tr
 
-        # Cloner + remplir une ligne par item
-        for item in items:
+        # Position réelle parmi TOUS les enfants du <w:tbl>
+        all_children = list(tbl)
+        insert_pos = all_children.index(tr_el)
+
+        # Si aucun item, supprimer juste la ligne modèle et sortir
+        if not items:
+            tbl.remove(tr_el)
+            break
+
+        # Cloner + remplir une ligne par item, en décalant l'index d'insertion
+        for i, item in enumerate(items):
             new_tr = _clone_row(template_row)
-            table._tbl.insert(row_index, new_tr)
-            # Trouver la vraie Row SQLAlchemy wrappée
-            from docx.table import _Row
+            tbl.insert(insert_pos + i, new_tr)
             new_row = _Row(new_tr, table)
             _fill_row(new_row, item)
-            row_index += 1
 
-        # Supprimer la ligne modèle
-        table._tbl.remove(template_row._tr)
+        # Supprimer la ligne modèle (maintenant décalée de len(items) positions)
+        tbl.remove(tr_el)
         break
 
 
