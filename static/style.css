@@ -194,6 +194,122 @@ body.has-sidebar {
 }
 .sidebar-overlay.active { display: block; }
 
+/* ═══════════════════════════════════════════
+   DASHBOARD HEADER (indicateurs + timeline | donut)
+════════════════════════════════════════════ */
+.dashboard-header {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.dashboard-left {
+  flex: 3;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.dashboard-right {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Indicateurs */
+.dash-indicators {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.dash-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 64px;
+}
+.dash-indicator i {
+  font-size: 1.3rem;
+  color: var(--chart-primary, #6366f1);
+}
+.dash-indicator-count {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--bs-body-color);
+}
+.dash-indicator-label {
+  font-size: .72rem;
+  color: var(--bs-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+}
+
+/* Timeline */
+.dash-timeline-wrap {
+  width: 100%;
+}
+.dash-timeline {
+  position: relative;
+  padding-bottom: 2.8rem; /* espace pour labels + années */
+}
+
+/* Barre de fond */
+.tl-bar-bg {
+  position: relative;
+  height: 28px;
+  background: var(--bs-secondary-bg, #e9ecef);
+  border-radius: 6px;
+  overflow: hidden;
+}
+[data-bs-theme="dark"] .tl-bar-bg {
+  background: rgba(255,255,255,.08);
+}
+
+/* Segments colorés */
+.tl-segment {
+  position: absolute;
+  top: 0; bottom: 0;
+  border-radius: 4px;
+  transition: opacity .2s;
+  min-width: 4px;
+}
+.tl-segment:hover { opacity: .75; cursor: default; }
+
+/* Labels entreprises */
+.tl-labels {
+  position: absolute;
+  top: 32px;
+  left: 0; right: 0;
+  height: 1.2rem;
+}
+.tl-label {
+  position: absolute;
+  font-size: .7rem;
+  color: var(--bs-secondary-color);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 2px;
+}
+
+/* Années */
+.tl-years {
+  position: absolute;
+  top: 52px;
+  left: 0; right: 0;
+  height: 1rem;
+}
+.tl-year {
+  position: absolute;
+  font-size: .65rem;
+  color: var(--bs-secondary-color);
+  transform: translateX(-50%);
+}
+
 /* ── Responsive : mobile ── */
 @media (max-width: 768px) {
   .app-sidebar {
@@ -205,6 +321,12 @@ body.has-sidebar {
   }
   .app-main {
     margin-left: 0 !important;
+  }
+  .dashboard-header {
+    flex-direction: column-reverse;
+  }
+  .dashboard-right {
+    width: 100%;
   }
 }
 

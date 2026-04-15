@@ -4,28 +4,123 @@
 {% block content %}
 
 <!-- ====================================================
-     Barre du haut : donut + badges de complétion
+     Barre du haut : indicateurs + timeline | donut
 ===================================================== -->
-<div class="d-flex align-items-center gap-4 mb-5">
-  <div class="completion-wrapper flex-shrink-0">
-    <canvas id="completionChart" width="130" height="130"></canvas>
-    <div class="completion-label">{{ completion }}%</div>
-    <div class="completion-sublabel">complété</div>
+<div class="dashboard-header mb-5">
+
+  <!-- Colonne gauche 75% : indicateurs + timeline -->
+  <div class="dashboard-left">
+
+    <!-- Ligne 1 : compteurs -->
+    <div class="dash-indicators">
+      <div class="dash-indicator">
+        <i class="bi bi-stars"></i>
+        <span class="dash-indicator-count">{{ hard_count }}</span>
+        <span class="dash-indicator-label">Hard skills</span>
+      </div>
+      <div class="dash-indicator">
+        <i class="bi bi-emoji-smile"></i>
+        <span class="dash-indicator-count">{{ soft_count }}</span>
+        <span class="dash-indicator-label">Soft skills</span>
+      </div>
+      <div class="dash-indicator">
+        <i class="bi bi-mortarboard"></i>
+        <span class="dash-indicator-count">{{ formations | length }}</span>
+        <span class="dash-indicator-label">Formation{{ 's' if formations | length > 1 else '' }}</span>
+      </div>
+      <div class="dash-indicator">
+        <i class="bi bi-patch-check"></i>
+        <span class="dash-indicator-count">{{ certifications | length }}</span>
+        <span class="dash-indicator-label">Certification{{ 's' if certifications | length > 1 else '' }}</span>
+      </div>
+    </div>
+
+    <!-- Ligne 2 : timeline des expériences -->
+    {% if experiences_asc %}
+    <div class="dash-timeline-wrap">
+      <div class="dash-timeline" id="expTimeline">
+        {# Calcul des bornes globales en Jinja #}
+        {% set ns = namespace(min_year=9999, max_year=0) %}
+        {% for exp in experiences_asc %}
+          {% set y1 = exp.date_debut.year %}
+          {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
+          {% if y1 < ns.min_year %}{% set ns.min_year = y1 %}{% endif %}
+          {% if y2 > ns.max_year %}{% set ns.max_year = y2 %}{% endif %}
+        {% endfor %}
+        {% set total_span = (ns.max_year - ns.min_year) if ns.max_year > ns.min_year else 1 %}
+
+        {# Barre de fond graduée #}
+        <div class="tl-bar-bg">
+          {# segments colorés #}
+          {% set palette = ['#6366f1','#818cf8','#a5b4fc'] %}
+          {% for exp in experiences_asc %}
+            {% set y1 = exp.date_debut.year %}
+            {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
+            {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(2) %}
+            {% set width_pct = ((y2 - y1) / total_span * 100) | round(2) %}
+            {% set color = palette[loop.index0 % 3] %}
+            <div class="tl-segment"
+                 style="left:{{ left_pct }}%;width:{{ [width_pct, 0.8] | max }}%;background:{{ color }};"
+                 title="{{ exp.entreprise }} ({{ exp.date_debut.year }}–{{ exp.date_fin.year if exp.date_fin else 'présent' }})">
+            </div>
+          {% endfor %}
+        </div>
+
+        {# Labels entreprises sous la barre #}
+        <div class="tl-labels">
+          {% for exp in experiences_asc %}
+            {% set y1 = exp.date_debut.year %}
+            {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
+            {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(2) %}
+            {% set width_pct = ((y2 - y1) / total_span * 100) | round(2) %}
+            <div class="tl-label"
+                 style="left:{{ left_pct }}%;width:{{ [width_pct, 0.8] | max }}%;">
+              {{ exp.entreprise }}
+            </div>
+          {% endfor %}
+        </div>
+
+        {# Années repères #}
+        <div class="tl-years">
+          {% for exp in experiences_asc %}
+            {% set y1 = exp.date_debut.year %}
+            {% set left_pct = ((y1 - ns.min_year) / total_span * 100) | round(2) %}
+            <span class="tl-year" style="left:{{ left_pct }}%;">{{ y1 }}</span>
+          {% endfor %}
+          <span class="tl-year" style="left:100%;transform:translateX(-100%);">
+            {{ ns.max_year }}
+          </span>
+        </div>
+
+      </div>
+    </div>
+    {% endif %}
+
   </div>
-  <div class="d-flex flex-wrap gap-2">
-    {% set checks = [
-      ("bio",        "bi-chat-left-text", "Bio"),
-      ("experience", "bi-briefcase",      "Expérience"),
-      ("formation",  "bi-mortarboard",    "Formation"),
-      ("competence", "bi-stars",          "Compétence"),
-    ] %}
-    {% for key, icon, label in checks %}
-    <span class="badge {% if criteria[key] %}bg-success{% else %}bg-secondary opacity-50{% endif %} d-flex align-items-center gap-1">
-      <i class="bi {{ icon }}"></i> {{ label }}
-      {% if criteria[key] %}<i class="bi bi-check-lg"></i>{% endif %}
-    </span>
-    {% endfor %}
+
+  <!-- Colonne droite 25% : donut + badges -->
+  <div class="dashboard-right">
+    <div class="completion-wrapper">
+      <canvas id="completionChart" width="130" height="130"></canvas>
+      <div class="completion-label">{{ completion }}%</div>
+      <div class="completion-sublabel">complété</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
+      {% set checks = [
+        ("bio",        "bi-chat-left-text", "Bio"),
+        ("experience", "bi-briefcase",      "Expérience"),
+        ("formation",  "bi-mortarboard",    "Formation"),
+        ("competence", "bi-stars",          "Compétence"),
+      ] %}
+      {% for key, icon, label in checks %}
+      <span class="badge {% if criteria[key] %}bg-success{% else %}bg-secondary opacity-50{% endif %} d-flex align-items-center gap-1">
+        <i class="bi {{ icon }}"></i> {{ label }}
+        {% if criteria[key] %}<i class="bi bi-check-lg"></i>{% endif %}
+      </span>
+      {% endfor %}
+    </div>
   </div>
+
 </div>
 
 <!-- ====================================================
