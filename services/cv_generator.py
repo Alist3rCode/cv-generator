@@ -218,6 +218,23 @@ def _build_text_paragraphs(text: str, p_el, template_run_el) -> list:
     return new_els
 
 
+def _get_para_full_text(p_el) -> str:
+    """
+    Extrait le texte complet d'un <w:p> en parcourant le XML directement.
+    Nécessaire car après _replace_in_paragraph, un <w:r> peut contenir
+    plusieurs <w:t> et des <w:br/>, invisibles via para.runs[i].text.
+    Les <w:br/> sont représentés par \\n.
+    """
+    parts = []
+    for r in p_el.findall(qn("w:r")):
+        for child in r:
+            if child.tag == qn("w:t"):
+                parts.append(child.text or "")
+            elif child.tag == qn("w:br"):
+                parts.append("\n")
+    return "".join(parts)
+
+
 def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
     """
     Trouve le paragraphe contenant `marker` dans la cellule et le remplace
@@ -229,7 +246,7 @@ def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
     du paragraphe template via clonage du <w:p> et du premier <w:r>.
     """
     for para in list(cell.paragraphs):
-        full_text = "".join(r.text for r in para.runs)
+        full_text = _get_para_full_text(para._p)
         if marker not in full_text:
             continue
 
