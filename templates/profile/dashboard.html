@@ -241,14 +241,13 @@
   <div class="card-header fw-semibold">
     <i class="bi bi-stars text-primary"></i> Nuage de compétences
   </div>
-  <div class="card-body p-0">
-    <canvas id="wordCloudCanvas" style="width:100%;display:block;"></canvas>
+  <div class="card-body p-2">
+    <div id="wordCloudContainer" class="word-cloud-container"></div>
   </div>
 </div>
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.js"></script>
 <script>
   const completion = {{ completion }};
 
@@ -282,107 +281,59 @@
     donutChart.update('none');
   };
 
-  // ── Nuage de mots ──────────────────────────────
+  // ── Nuage de mots flottant (HTML + CSS animations) ─────────────────
   (function() {
-    var canvas = document.getElementById('wordCloudCanvas');
-    if (!canvas) return;
+    var container = document.getElementById('wordCloudContainer');
+    if (!container) return;
 
-    var rawWords = {{ cloud_words | tojson }};
-    if (!rawWords.length) return;
+    var words = {{ cloud_words | tojson }};
+    if (!words.length) return;
 
-    // Palette : indigo pour hard, vert pour soft
     var hardColors = ['#4f46e5','#6366f1','#818cf8','#a5b4fc'];
     var softColors = ['#16a34a','#22c55e','#4ade80'];
-    var colorMap   = {};   // mot → couleur fixe pour la cohérence entre redraws
 
-    rawWords.forEach(function(w) {
-      var pool = w.type === 'hard' ? hardColors : softColors;
-      colorMap[w.nom] = pool[Math.floor(Math.random() * pool.length)];
+    // Taille de police : size normalisée 1-10 → 11px à 38px
+    function pxSize(s) { return Math.round(11 + (s - 1) / 9 * 27); }
+
+    // Placement pseudo-aléatoire mais reproductible (pas de chevauchement garanti
+    // via un simple seeded spread — suffisant pour un nuage)
+    var rng = (function() {
+      var seed = 42;
+      return function() { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
+    })();
+
+    // Trier par poids décroissant pour placer les grands mots en premier
+    var sorted = words.slice().sort(function(a, b) { return b.size - a.size; });
+
+    sorted.forEach(function(w, i) {
+      var span = document.createElement('span');
+      span.className   = 'wc-word';
+      span.textContent = w.nom;
+
+      // Couleur
+      var pool  = w.type === 'hard' ? hardColors : softColors;
+      var color = pool[Math.floor(rng() * pool.length)];
+
+      // Paramètres d'animation flottante unique par mot
+      var dur    = (5 + rng() * 6).toFixed(2);          // 5s–11s
+      var delay  = (rng() * -10).toFixed(2);             // déphasage initial
+      var dx     = ((rng() - 0.5) * 14).toFixed(1);     // ±7px horizontal
+      var dy     = ((rng() - 0.5) * 10).toFixed(1);     // ±5px vertical
+      var rot    = ((rng() - 0.5) * 6).toFixed(1);      // ±3° rotation
+
+      span.style.cssText = [
+        'font-size:'    + pxSize(w.size) + 'px',
+        'color:'        + color,
+        'font-weight:'  + (w.size > 5 ? '700' : '500'),
+        '--dx:'         + dx  + 'px',
+        '--dy:'         + dy  + 'px',
+        '--rot:'        + rot + 'deg',
+        'animation-duration:'        + dur   + 's',
+        'animation-delay:'           + delay + 's',
+      ].join(';');
+
+      container.appendChild(span);
     });
-
-    function sizeCanvas() {
-      // Largeur réelle du conteneur parent
-      var W = canvas.parentElement.clientWidth || 800;
-      var H = Math.round(W * 0.32);   // ratio 3:1 environ
-      H = Math.max(180, Math.min(320, H));
-      canvas.width  = W;
-      canvas.height = H;
-      canvas.style.height = H + 'px';
-    }
-
-    // Tailles de police : size normalisée 1-10 → 12px à 40px
-    function pxSize(normalizedSize) {
-      return Math.round(12 + (normalizedSize - 1) / 9 * 28);
-    }
-
-    // wordcloud2 attend [[mot, taille_px], ...]
-    var list = rawWords.map(function(w) {
-      return [w.nom, pxSize(w.size)];
-    });
-
-    var animTimer = null;
-    var drawCount = 0;
-
-    function draw() {
-      if (typeof WordCloud === 'undefined') { setTimeout(draw, 80); return; }
-      sizeCanvas();
-
-      // Décaler légèrement les couleurs à chaque redraw pour l'effet vivant
-      drawCount++;
-      var shiftedColors = {};
-      rawWords.forEach(function(w) {
-        var pool   = w.type === 'hard' ? hardColors : softColors;
-        var base   = pool.indexOf(colorMap[w.nom]);
-        shiftedColors[w.nom] = pool[(base + drawCount) % pool.length];
-      });
-
-      WordCloud(canvas, {
-        list:           list,
-        gridSize:       Math.round(canvas.width / 60),
-        weightFactor:   1,
-        fontFamily:     'system-ui, -apple-system, sans-serif',
-        fontWeight:     '600',
-        color:          function(word) { return shiftedColors[word] || '#6366f1'; },
-        backgroundColor:'transparent',
-        rotateRatio:    0.25,       // 25 % des mots légèrement inclinés
-        rotationSteps:  2,          // 0° ou 90° uniquement
-        shrinkToFit:    true,
-        drawOutOfBound: false,
-        shuffle:        true,
-        clearCanvas:    true,
-        minSize:        10,
-      });
-    }
-
-    function scheduleDraw() {
-      clearTimeout(animTimer);
-      animTimer = setTimeout(function() {
-        draw();
-        scheduleDraw();          // relancer pour le prochain cycle
-      }, 7000);
-    }
-
-    // Premier dessin après que le layout est stabilisé
-    requestAnimationFrame(function() {
-      draw();
-      scheduleDraw();
-    });
-
-    // Resize : redessiner immédiatement
-    window.addEventListener('resize', function() {
-      clearTimeout(animTimer);
-      draw();
-      scheduleDraw();
-    });
-
-    // Thème : redessiner avec les nouvelles couleurs
-    window.__onThemeChangePrev = window.__onThemeChange;
-    window.__onThemeChange = function(theme) {
-      if (window.__onThemeChangePrev) window.__onThemeChangePrev(theme);
-      clearTimeout(animTimer);
-      draw();
-      scheduleDraw();
-    };
   })();
 
   // ── Timeline : masquer les années trop proches ──

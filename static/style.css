@@ -310,9 +310,40 @@ body.has-sidebar {
   white-space: nowrap;
 }
 
-/* ── Nuage de mots ── */
-#wordCloudCanvas {
-  border-radius: 0 0 10px 10px;
+/* ── Nuage de mots flottant ── */
+.word-cloud-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  padding: 18px 12px;
+  min-height: 160px;
+}
+
+.wc-word {
+  display: inline-block;
+  line-height: 1.1;
+  cursor: default;
+  white-space: nowrap;
+  transition: opacity 0.3s;
+  animation-name: wc-float;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  opacity: 0.88;
+}
+.wc-word:hover {
+  opacity: 1;
+}
+
+@keyframes wc-float {
+  from {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate(var(--dx, 4px), var(--dy, -4px)) rotate(var(--rot, 2deg));
+  }
 }
 
 /* ── Responsive : mobile ── */
