@@ -290,6 +290,7 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
         {
             "{{FORM_DIPLOME}}": f.diplome,
             "{{FORM_ETAB}}":    f.etablissement,
+            "{{FORM_VILLE}}":   f.ville or "",
             "{{FORM_DEBUT}}":   _fmt_date(f.date_debut),
             "{{FORM_FIN}}":     _fmt_date(f.date_fin),
         }
