@@ -48,7 +48,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
     all_exps   = db.query(Experience).filter(Experience.user_id == current_user.id, Experience.deleted_at == None).order_by(Experience.date_debut.asc()).all()
     all_forms  = db.query(Formation).filter(Formation.user_id == current_user.id, Formation.deleted_at == None).order_by(Formation.date_debut.desc()).all()
     all_certs  = db.query(Certification).filter(Certification.user_id == current_user.id, Certification.deleted_at == None).order_by(Certification.date_obtention.desc()).all()
-    all_comps  = db.query(Competence).filter(Competence.user_id == current_user.id, Competence.deleted_at == None).all()
+    all_comps  = db.query(Competence).filter(Competence.user_id == current_user.id).all()
 
     def _dedup(items):
         seen, result = set(), []
