@@ -184,51 +184,77 @@ def _make_run_xml(rpr_el, text: str, bold: bool, italic: bool, underline: bool):
     return r
 
 
+def _build_text_paragraphs(text: str, ppr_el, rpr_el) -> list:
+    """
+    Convertit un texte brut (pouvant contenir des \n) en liste de <w:p>.
+    Chaque \n crée un nouveau paragraphe (pas un <w:br/>).
+    Les segments vides sont conservés comme paragraphes vides.
+    """
+    new_els = []
+    for segment in text.split("\n"):
+        new_p = etree.Element(qn("w:p"))
+        if ppr_el is not None:
+            new_p.append(copy.deepcopy(ppr_el))
+        if segment:
+            r_el = _make_run_xml(rpr_el, segment, bold=False, italic=False, underline=False)
+            new_p.append(r_el)
+        new_els.append(new_p)
+    return new_els
+
+
 def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
     """
-    Trouve le paragraphe contenant `marker` dans la cellule,
-    le remplace par des paragraphes Word construits à partir du HTML Quill.
-    Si le HTML est vide, efface juste le marqueur.
+    Trouve le paragraphe contenant `marker` dans la cellule et le remplace
+    par des paragraphes Word construits à partir du HTML Quill.
+
+    Si d'autres balises (déjà remplacées) sont présentes dans le même paragraphe
+    avant ou après le marker, leur texte est préservé dans des paragraphes séparés
+    autour du contenu HTML.
     """
     for para in list(cell.paragraphs):
         full_text = "".join(r.text for r in para.runs)
         if marker not in full_text:
             continue
 
+        before, after = full_text.split(marker, 1)
         blocks = _parse_html_blocks(html or "")
         p_el = para._p
         parent = p_el.getparent()
         insert_idx = list(parent).index(p_el)
 
-        if not blocks:
-            # Effacer le marqueur, garder le paragraphe vide
-            if para.runs:
-                para.runs[0].text = ""
-                for r in para.runs[1:]:
-                    r.text = ""
-            return
-
-        # Récupérer les propriétés du paragraphe et du 1er run pour les cloner
         ppr_el = p_el.find(qn("w:pPr"))
         first_run = p_el.find(qn("w:r"))
         rpr_el = first_run.find(qn("w:rPr")) if first_run is not None else None
 
-        # Créer un nouveau <w:p> par bloc HTML
         new_els = []
-        for block in blocks:
+
+        # Texte avant le marker (ex: vide en général)
+        if before:
+            new_els += _build_text_paragraphs(before, ppr_el, rpr_el)
+
+        # Contenu HTML converti en paragraphes Word
+        if blocks:
+            for block in blocks:
+                new_p = etree.Element(qn("w:p"))
+                if ppr_el is not None:
+                    new_p.append(copy.deepcopy(ppr_el))
+                if block["prefix"]:
+                    new_p.append(_make_run_xml(rpr_el, block["prefix"], False, False, False))
+                for run in block["runs"]:
+                    new_p.append(_make_run_xml(rpr_el, run["text"], run["bold"], run["italic"], run["underline"]))
+                new_els.append(new_p)
+
+        # Texte après le marker (ex: "\nEnvironnement Technique : Python, Java")
+        if after:
+            new_els += _build_text_paragraphs(after, ppr_el, rpr_el)
+
+        # Si rien du tout, insérer un paragraphe vide pour ne pas laisser de trou
+        if not new_els:
             new_p = etree.Element(qn("w:p"))
             if ppr_el is not None:
                 new_p.append(copy.deepcopy(ppr_el))
-            # Préfixe (bullet ou numéro)
-            if block["prefix"]:
-                r_el = _make_run_xml(rpr_el, block["prefix"], bold=False, italic=False, underline=False)
-                new_p.append(r_el)
-            for run in block["runs"]:
-                r_el = _make_run_xml(rpr_el, run["text"], run["bold"], run["italic"], run["underline"])
-                new_p.append(r_el)
             new_els.append(new_p)
 
-        # Insérer les nouveaux paragraphes et supprimer le placeholder
         for i, new_p in enumerate(new_els):
             parent.insert(insert_idx + i, new_p)
         parent.remove(p_el)
