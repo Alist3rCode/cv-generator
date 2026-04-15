@@ -287,72 +287,101 @@
     var canvas = document.getElementById('wordCloudCanvas');
     if (!canvas) return;
 
-    var words = {{ cloud_words | tojson }};
-    if (!words.length) return;
+    var rawWords = {{ cloud_words | tojson }};
+    if (!rawWords.length) return;
 
-    // Palette indigo (hard) + vert (soft)
-    var hardColors = ['#6366f1','#818cf8','#4f46e5','#a5b4fc'];
-    var softColors = ['#22c55e','#16a34a','#4ade80','#15803d'];
+    // Palette : indigo pour hard, vert pour soft
+    var hardColors = ['#4f46e5','#6366f1','#818cf8','#a5b4fc'];
+    var softColors = ['#16a34a','#22c55e','#4ade80'];
+    var colorMap   = {};   // mot → couleur fixe pour la cohérence entre redraws
 
-    // Adapter la hauteur au nombre de mots
-    var H = Math.max(200, Math.min(360, words.length * 18));
-    canvas.height = H;
-    canvas.style.height = H + 'px';
-
-    // Convertir size (1-10) en px de police
-    var BASE = 13, RANGE = 28;   // 13px → 41px
-
-    // Mélanger pour un placement naturel
-    words = words.slice().sort(function() { return Math.random() - 0.5; });
-
-    var list = words.map(function(w) {
-      return [w.nom, Math.round(BASE + (w.size - 1) / 9 * RANGE), w.type];
+    rawWords.forEach(function(w) {
+      var pool = w.type === 'hard' ? hardColors : softColors;
+      colorMap[w.nom] = pool[Math.floor(Math.random() * pool.length)];
     });
 
-    function getColor(type) {
-      var pool = type === 'hard' ? hardColors : softColors;
-      return pool[Math.floor(Math.random() * pool.length)];
+    function sizeCanvas() {
+      // Largeur réelle du conteneur parent
+      var W = canvas.parentElement.clientWidth || 800;
+      var H = Math.round(W * 0.32);   // ratio 3:1 environ
+      H = Math.max(180, Math.min(320, H));
+      canvas.width  = W;
+      canvas.height = H;
+      canvas.style.height = H + 'px';
     }
 
+    // Tailles de police : size normalisée 1-10 → 12px à 40px
+    function pxSize(normalizedSize) {
+      return Math.round(12 + (normalizedSize - 1) / 9 * 28);
+    }
+
+    // wordcloud2 attend [[mot, taille_px], ...]
+    var list = rawWords.map(function(w) {
+      return [w.nom, pxSize(w.size)];
+    });
+
+    var animTimer = null;
+    var drawCount = 0;
+
     function draw() {
-      if (typeof WordCloud === 'undefined') {
-        setTimeout(draw, 100);
-        return;
-      }
-      var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+      if (typeof WordCloud === 'undefined') { setTimeout(draw, 80); return; }
+      sizeCanvas();
+
+      // Décaler légèrement les couleurs à chaque redraw pour l'effet vivant
+      drawCount++;
+      var shiftedColors = {};
+      rawWords.forEach(function(w) {
+        var pool   = w.type === 'hard' ? hardColors : softColors;
+        var base   = pool.indexOf(colorMap[w.nom]);
+        shiftedColors[w.nom] = pool[(base + drawCount) % pool.length];
+      });
+
       WordCloud(canvas, {
-        list: list.map(function(item) { return [item[0], item[1]]; }),
-        gridSize: 10,
-        weightFactor: 1,
-        fontFamily: 'system-ui, sans-serif',
-        color: function(word) {
-          var entry = list.find(function(i) { return i[0] === word; });
-          return entry ? getColor(entry[2]) : '#6366f1';
-        },
-        backgroundColor: isDark ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0)',
-        rotateRatio: 0.3,
-        rotationSteps: 2,
-        shrinkToFit: true,
+        list:           list,
+        gridSize:       Math.round(canvas.width / 60),
+        weightFactor:   1,
+        fontFamily:     'system-ui, -apple-system, sans-serif',
+        fontWeight:     '600',
+        color:          function(word) { return shiftedColors[word] || '#6366f1'; },
+        backgroundColor:'transparent',
+        rotateRatio:    0.25,       // 25 % des mots légèrement inclinés
+        rotationSteps:  2,          // 0° ou 90° uniquement
+        shrinkToFit:    true,
         drawOutOfBound: false,
-        shuffle: true,
-        clearCanvas: true,
-        // Animation douce : on redessine avec un léger décalage toutes les 6s
+        shuffle:        true,
+        clearCanvas:    true,
+        minSize:        10,
       });
     }
 
-    // Redessiner avec de nouvelles couleurs aléatoires pour l'effet "vivant"
-    function animate() {
-      draw();
-      setTimeout(animate, 6000);
+    function scheduleDraw() {
+      clearTimeout(animTimer);
+      animTimer = setTimeout(function() {
+        draw();
+        scheduleDraw();          // relancer pour le prochain cycle
+      }, 7000);
     }
 
-    animate();
+    // Premier dessin après que le layout est stabilisé
+    requestAnimationFrame(function() {
+      draw();
+      scheduleDraw();
+    });
 
-    // Réajuster si le thème change
+    // Resize : redessiner immédiatement
+    window.addEventListener('resize', function() {
+      clearTimeout(animTimer);
+      draw();
+      scheduleDraw();
+    });
+
+    // Thème : redessiner avec les nouvelles couleurs
     window.__onThemeChangePrev = window.__onThemeChange;
     window.__onThemeChange = function(theme) {
       if (window.__onThemeChangePrev) window.__onThemeChangePrev(theme);
+      clearTimeout(animTimer);
       draw();
+      scheduleDraw();
     };
   })();
 
