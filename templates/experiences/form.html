@@ -260,7 +260,7 @@
   function makeChip(skill, side) {
     var chip = document.createElement('span');
     chip.className = 'picker-chip user-select-none';
-    chip.style.cssText = 'cursor:pointer;display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.82rem;';
+    chip.style.cssText = 'cursor:pointer;display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.82rem;line-height:1.4;';
     chip.dataset.gid = skill.gid;
     chip.dataset.side = side;
     chip.textContent = skill.nom;
