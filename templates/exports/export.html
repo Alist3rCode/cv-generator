@@ -45,7 +45,6 @@
       <div class="mb-4">
         <label class="form-label">Nom du fichier <span class="text-muted small fw-normal">(facultatif)</span></label>
         <input type="text" name="nom" id="nomExport" class="form-control" />
-        <div class="form-text text-muted" id="nomPlaceholderHint"></div>
       </div>
 
       <button type="submit" class="btn btn-primary">
@@ -149,7 +148,6 @@ function confirmDeleteExport(exportId, nom) {
 (function() {
   var templateSelect = document.getElementById('templateSelect');
   var nomInput       = document.getElementById('nomExport');
-  var hint           = document.getElementById('nomPlaceholderHint');
   if (!templateSelect || !nomInput) return;
 
   function updateHint() {
@@ -161,9 +159,7 @@ function confirmDeleteExport(exportId, nom) {
     var yyyy = now.getFullYear();
     var hh   = String(now.getHours()).padStart(2, '0');
     var min  = String(now.getMinutes()).padStart(2, '0');
-    var defaultNom = nom + ' - ' + dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
-    nomInput.placeholder = defaultNom;
-    if (hint) hint.textContent = 'Nom par défaut : ' + defaultNom;
+    nomInput.placeholder = nom + ' - ' + dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
   }
 
   templateSelect.addEventListener('change', updateHint);
