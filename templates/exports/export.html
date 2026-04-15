@@ -84,12 +84,11 @@
               {% else %}
               <span class="text-muted small">En cours…</span>
               {% endif %}
-              <form method="post" action="/exports/{{ e.id }}/delete"
-                    onsubmit="return confirm('Supprimer cet export ?')">
-                <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </form>
+              <button type="button" class="btn btn-sm btn-outline-danger"
+                      title="Supprimer"
+                      onclick="confirmDeleteExport('{{ e.id }}', '{{ e.nom | replace("'", "\\'") }}')">
+                <i class="bi bi-trash"></i>
+              </button>
             </div>
           </td>
         </tr>
@@ -100,7 +99,53 @@
 </div>
 {% endif %}
 
+<!-- Modale de confirmation de suppression -->
+<div class="modal fade" id="deleteExportModal" tabindex="-1" aria-labelledby="deleteExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-danger">
+        <h5 class="modal-title text-danger" id="deleteExportModalLabel">
+          <i class="bi bi-exclamation-triangle-fill"></i> Supprimer l'export
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <p>Vous êtes sur le point de supprimer <strong id="deleteExportName"></strong>.</p>
+        <div class="alert alert-danger d-flex gap-2 align-items-start mb-0">
+          <i class="bi bi-slash-circle-fill flex-shrink-0 mt-1"></i>
+          <div>
+            <strong>Cette action est irrémédiable.</strong><br>
+            Le fichier sera définitivement supprimé et ne pourra pas être récupéré.
+            Il vous faudra générer un nouvel export si vous en avez besoin.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> Annuler
+        </button>
+        <form id="deleteExportForm" method="post" action="">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash"></i> Supprimer définitivement
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+var _deleteExportModal = null;
+
+function confirmDeleteExport(exportId, nom) {
+  document.getElementById('deleteExportName').textContent = nom || 'cet export';
+  document.getElementById('deleteExportForm').action = '/exports/' + exportId + '/delete';
+  if (!_deleteExportModal) {
+    _deleteExportModal = new bootstrap.Modal(document.getElementById('deleteExportModal'));
+  }
+  _deleteExportModal.show();
+}
+
 (function() {
   var templateSelect = document.getElementById('templateSelect');
   var nomInput       = document.getElementById('nomExport');
