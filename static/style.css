@@ -310,6 +310,11 @@ body.has-sidebar {
   white-space: nowrap;
 }
 
+/* ── Nuage de mots ── */
+#wordCloudCanvas {
+  border-radius: 0 0 10px 10px;
+}
+
 /* ── Responsive : mobile ── */
 @media (max-width: 768px) {
   .app-sidebar {
