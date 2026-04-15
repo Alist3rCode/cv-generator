@@ -65,6 +65,35 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
 
     exps_dedup = _dedup(all_exps)  # triées ASC pour la timeline
 
+    # ── Nuage de mots : poids = niveau * nb_occurrences_dans_expériences ──
+    # Compter les occurrences de chaque GID dans toutes les expériences
+    from collections import Counter as _Counter
+    gid_counts: _Counter = _Counter()
+    for exp in exps_dedup:
+        for gid in (exp.hard_skills or []):
+            gid_counts[gid] += 1
+        for gid in (exp.soft_skills or []):
+            gid_counts[gid] += 1
+
+    # Construire la liste {nom, weight} pour le nuage
+    cloud_words = []
+    seen_gids: set = set()
+    for comp in comps_dedup:
+        if comp.gid in seen_gids:
+            continue
+        seen_gids.add(comp.gid)
+        gid_str = str(comp.gid)
+        count   = gid_counts.get(gid_str, 0)
+        # Compétences sans expérience associée : poids minimal = niveau seul
+        weight  = comp.niveau.value * max(count, 1)
+        cloud_words.append({"nom": comp.nom, "weight": weight, "type": comp.type.value})
+
+    # Normaliser : ramener weight entre 1 et 10 pour l'affichage
+    if cloud_words:
+        max_w = max(w["weight"] for w in cloud_words)
+        for w in cloud_words:
+            w["size"] = round(1 + (w["weight"] / max_w) * 9, 2)
+
     from datetime import date as _date
     return templates.TemplateResponse("profile/dashboard.html", {
         "request":        request,
@@ -79,6 +108,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
         "hard_count":     hard_count,
         "soft_count":     soft_count,
         "now_year":       _date.today().year,
+        "cloud_words":    cloud_words,
     })
 
 

@@ -251,7 +251,6 @@ body.has-sidebar {
 /* Timeline */
 .dash-timeline-wrap {
   width: 100%;
-  /* assez de place pour les labels + années en absolu */
   padding-bottom: 3.2rem;
   position: relative;
 }
@@ -278,12 +277,11 @@ body.has-sidebar {
 }
 .tl-segment:hover { opacity: .75; cursor: default; }
 
-/* Labels entreprises — positionnés sous la barre, visibles */
+/* Labels entreprises — positionnés sous la barre */
 .tl-labels {
   position: absolute;
   top: 32px;
   left: 0; right: 0;
-  /* overflow visible pour ne pas couper les labels */
 }
 .tl-label {
   position: absolute;
@@ -308,6 +306,42 @@ body.has-sidebar {
   color: var(--bs-secondary-color);
   transform: translateX(-50%);
   white-space: nowrap;
+}
+
+/* ── Nuage de mots flottant ── */
+.word-cloud-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  padding: 18px 12px;
+  min-height: 160px;
+}
+
+.wc-word {
+  display: inline-block;
+  line-height: 1.1;
+  cursor: default;
+  white-space: nowrap;
+  transition: opacity 0.3s;
+  animation-name: wc-float;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  opacity: 0.88;
+}
+.wc-word:hover {
+  opacity: 1;
+}
+
+@keyframes wc-float {
+  from {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate(var(--dx, 4px), var(--dy, -4px)) rotate(var(--rot, 2deg));
+  }
 }
 
 /* ── Responsive : mobile ── */

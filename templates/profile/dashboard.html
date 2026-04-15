@@ -69,7 +69,7 @@
         {% endfor %}
       </div>
 
-      {# Labels entreprises — un par segment, positionné sous la barre #}
+      {# Labels entreprises sous la barre #}
       <div class="tl-labels">
         {% for exp in experiences_asc %}
           {% set y1 = exp.date_debut.year %}
@@ -83,15 +83,13 @@
         {% endfor %}
       </div>
 
-      {# Années : début de chaque segment + dernière année à droite.
-         Le JS masquera celles qui se chevauchent. #}
+      {# Années repères #}
       <div class="tl-years" id="tlYears">
         {% for exp in experiences_asc %}
           {% set y1 = exp.date_debut.year %}
           {% set left_pct = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
           <span class="tl-year" style="left:{{ left_pct }}%;" data-year="{{ y1 }}">{{ y1 }}</span>
         {% endfor %}
-        {# Dernière année uniquement si différente du dernier début #}
         {% if experiences_asc[-1].date_fin %}
           {% set last_y = experiences_asc[-1].date_fin.year %}
         {% else %}
@@ -233,6 +231,20 @@
   {% endif %}
 </div>
 
+<!-- ====================================================
+     Nuage de mots — compétences
+===================================================== -->
+{% if cloud_words %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-stars text-primary"></i> Nuage de compétences
+  </div>
+  <div class="card-body p-2">
+    <div id="wordCloudContainer" class="word-cloud-container"></div>
+  </div>
+</div>
+{% endif %}
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
   const completion = {{ completion }};
@@ -271,30 +283,73 @@
   (function() {
     var container = document.getElementById('tlYears');
     if (!container) return;
-
-    // Positionner la dernière année (end) à droite
     var endEl = container.querySelector('.tl-year--end');
-    if (endEl) {
-      endEl.style.left  = '100%';
-      endEl.style.transform = 'translateX(-100%)';
-    }
-
-    // Attendre que le layout soit calculé
+    if (endEl) { endEl.style.left = '100%'; endEl.style.transform = 'translateX(-100%)'; }
     requestAnimationFrame(function() {
       var spans = Array.from(container.querySelectorAll('.tl-year'));
-      var minGap = 28; // px minimum entre deux labels
       var lastRight = -Infinity;
-
       spans.forEach(function(el) {
         var rect = el.getBoundingClientRect();
-        if (rect.left < lastRight + minGap) {
-          el.style.visibility = 'hidden';
-        } else {
-          el.style.visibility = 'visible';
-          lastRight = rect.right;
-        }
+        if (rect.left < lastRight + 28) { el.style.visibility = 'hidden'; }
+        else { el.style.visibility = 'visible'; lastRight = rect.right; }
       });
     });
   })();
+
+  // ── Nuage de mots flottant (HTML + CSS animations) ─────────────────
+  (function() {
+    var container = document.getElementById('wordCloudContainer');
+    if (!container) return;
+
+    var words = {{ cloud_words | tojson }};
+    if (!words.length) return;
+
+    var hardColors = ['#c2440f','#e05c1a','#f07030','#ea8040'];  /* orange sanguine */
+    var softColors = ['#16a34a','#22c55e','#4ade80'];
+
+    // Taille de police : size normalisée 1-10 → 11px à 38px
+    function pxSize(s) { return Math.round(11 + (s - 1) / 9 * 27); }
+
+    // Placement pseudo-aléatoire mais reproductible (pas de chevauchement garanti
+    // via un simple seeded spread — suffisant pour un nuage)
+    var rng = (function() {
+      var seed = 42;
+      return function() { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
+    })();
+
+    // Trier par poids décroissant pour placer les grands mots en premier
+    var sorted = words.slice().sort(function(a, b) { return b.size - a.size; });
+
+    sorted.forEach(function(w, i) {
+      var span = document.createElement('span');
+      span.className   = 'wc-word';
+      span.textContent = w.nom;
+
+      // Couleur
+      var pool  = w.type === 'hard' ? hardColors : softColors;
+      var color = pool[Math.floor(rng() * pool.length)];
+
+      // Paramètres d'animation flottante unique par mot
+      var dur    = (5 + rng() * 6).toFixed(2);          // 5s–11s
+      var delay  = (rng() * -10).toFixed(2);             // déphasage initial
+      var dx     = ((rng() - 0.5) * 14).toFixed(1);     // ±7px horizontal
+      var dy     = ((rng() - 0.5) * 10).toFixed(1);     // ±5px vertical
+      var rot    = ((rng() - 0.5) * 6).toFixed(1);      // ±3° rotation
+
+      span.style.cssText = [
+        'font-size:'    + pxSize(w.size) + 'px',
+        'color:'        + color,
+        'font-weight:'  + (w.size > 5 ? '700' : '500'),
+        '--dx:'         + dx  + 'px',
+        '--dy:'         + dy  + 'px',
+        '--rot:'        + rot + 'deg',
+        'animation-duration:'        + dur   + 's',
+        'animation-delay:'           + delay + 's',
+      ].join(';');
+
+      container.appendChild(span);
+    });
+  })();
+
 </script>
 {% endblock %}

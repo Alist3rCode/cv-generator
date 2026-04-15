@@ -83,7 +83,7 @@ def _load_comps_for_user(db: Session, user_id, prefer_lang_code="fr"):
                 break
         if chosen is None:
             chosen = rows[0]
-        entry = {"gid": gid, "nom": chosen.nom, "niveau": chosen.niveau.value}
+        entry = {"gid": gid, "nom": chosen.nom, "niveau": chosen.niveau.value, "type": chosen.type.value}
         if chosen.type == SkillTypeEnum.hard:
             comps_hard.append(entry)
         else:

@@ -99,10 +99,42 @@
           {# Panneau gauche — compétences assignées #}
           <div class="col-md-5">
             <div class="card h-100">
-              <div class="card-header py-2 bg-primary bg-opacity-10">
+              <div class="card-header py-2 bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
                 <strong><i class="bi bi-check2-circle"></i> Compétences de cette expérience</strong>
+                <button type="button" class="btn btn-outline-success btn-sm" id="btnShowInlineForm">
+                  <i class="bi bi-plus-circle"></i> Nouvelle
+                </button>
               </div>
               <div class="card-body p-2">
+                {# Mini-formulaire inline #}
+                <div id="inlineForm" class="mb-2 p-2 border rounded" style="display:none;background:var(--bs-tertiary-bg);">
+                  <div class="mb-2">
+                    <input type="text" id="inlineNom" class="form-control form-control-sm" placeholder="Nom de la compétence" />
+                  </div>
+                  <div class="row g-1 mb-2">
+                    <div class="col-6">
+                      <select id="inlineType" class="form-select form-select-sm">
+                        <option value="hard">Hard skill</option>
+                        <option value="soft">Soft skill</option>
+                      </select>
+                    </div>
+                    <div class="col-6">
+                      <select id="inlineNiveau" class="form-select form-select-sm">
+                        <option value="1">1 — Débutant</option>
+                        <option value="2">2 — Intermédiaire</option>
+                        <option value="3">3 — Avancé</option>
+                        <option value="4">4 — Expert</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-sm" id="btnInlineSubmit">
+                      <i class="bi bi-check"></i> Créer et ajouter
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnInlineCancel">Annuler</button>
+                  </div>
+                  <div id="inlineError" class="text-danger small mt-1" style="display:none;"></div>
+                </div>
                 <p class="small text-muted mb-1 fw-semibold">Hard Skills</p>
                 <div id="assignedHard" class="d-flex flex-wrap gap-1 mb-2 picker-zone" data-type="hard" data-side="assigned" style="min-height:40px;"></div>
                 <hr class="my-1">
@@ -135,39 +167,6 @@
                 <p class="small text-muted mb-1 fw-semibold">Soft Skills</p>
                 <div id="availableSoft" class="d-flex flex-wrap gap-1 picker-zone" data-type="soft" data-side="available" style="min-height:40px;"></div>
 
-                {# Mini-formulaire inline #}
-                <hr class="my-2">
-                <button type="button" class="btn btn-outline-success btn-sm w-100" id="btnShowInlineForm">
-                  <i class="bi bi-plus-circle"></i> Ajouter une compétence
-                </button>
-                <div id="inlineForm" class="mt-2 p-2 border rounded" style="display:none;background:var(--bs-tertiary-bg);">
-                  <div class="mb-2">
-                    <input type="text" id="inlineNom" class="form-control form-control-sm" placeholder="Nom de la compétence" />
-                  </div>
-                  <div class="row g-1 mb-2">
-                    <div class="col-6">
-                      <select id="inlineType" class="form-select form-select-sm">
-                        <option value="hard">Hard skill</option>
-                        <option value="soft">Soft skill</option>
-                      </select>
-                    </div>
-                    <div class="col-6">
-                      <select id="inlineNiveau" class="form-select form-select-sm">
-                        <option value="1">1 — Débutant</option>
-                        <option value="2">2 — Intermédiaire</option>
-                        <option value="3">3 — Avancé</option>
-                        <option value="4">4 — Expert</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-success btn-sm" id="btnInlineSubmit">
-                      <i class="bi bi-check"></i> Créer et ajouter
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-sm" id="btnInlineCancel">Annuler</button>
-                  </div>
-                  <div id="inlineError" class="text-danger small mt-1" style="display:none;"></div>
-                </div>
               </div>
             </div>
           </div>
@@ -249,28 +248,29 @@
   var selectedGids = new Set(); // GIDs sélectionnés (clic simple)
 
   function levelDots(niveau, type) {
-    var color = type === 'hard' ? 'primary' : 'success';
+    // hard : orange sanguine, soft : vert
+    var style = type === 'hard' ? 'color:#e05c1a' : 'color:#22c55e';
     var dots = '';
     for (var i = 1; i <= 4; i++) {
-      dots += '<i class="bi bi-circle' + (i <= niveau ? '-fill' : '') + ' text-' + color + ' small"></i>';
+      dots += '<i class="bi bi-circle' + (i <= niveau ? '-fill' : '') + ' small" style="' + style + '"></i>';
     }
     return dots;
   }
 
   function makeChip(skill, side) {
     var chip = document.createElement('span');
-    chip.className = 'badge rounded-pill border picker-chip user-select-none';
-    chip.style.cursor = 'pointer';
-    chip.style.fontSize = '0.82rem';
+    chip.className = 'picker-chip user-select-none';
+    chip.style.cssText = 'cursor:pointer;display:inline-block;padding:7px 8px;border-radius:4px;font-size:0.82rem;line-height:1.4;';
     chip.dataset.gid = skill.gid;
     chip.dataset.side = side;
-    chip.innerHTML = '<span class="me-1">' + skill.nom + '</span>' + levelDots(skill.niveau, skill.type || 'hard');
+    chip.textContent = skill.nom;
 
-    // Couleur selon côté
     if (side === 'assigned') {
-      chip.classList.add('bg-primary', 'text-white', 'border-primary');
+      chip.style.background = 'var(--bs-primary-bg-subtle)';
+      chip.style.color      = 'var(--bs-primary-text-emphasis)';
     } else {
-      chip.classList.add('bg-light', 'text-dark', 'border-secondary');
+      chip.style.background = 'var(--bs-secondary-bg)';
+      chip.style.color      = 'var(--bs-secondary-color)';
     }
 
     chip.addEventListener('click', function(e) {
@@ -279,7 +279,6 @@
       var isSelected = selectedGids.has(gid);
       if (isSelected) {
         selectedGids.delete(gid);
-        chip.classList.remove('opacity-75', 'border-warning');
         chip.style.outline = '';
       } else {
         selectedGids.add(gid);
