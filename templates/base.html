@@ -132,11 +132,13 @@
       <i class="bi bi-download sidebar-icon"></i>
       <span class="sidebar-label">Exporter CV</span>
     </a>
+    {% if request.state.is_admin %}
     <a href="/templates/"
        class="sidebar-link {% if '/templates' in request.url.path %}active{% endif %}">
       <i class="bi bi-layout-text-window sidebar-icon"></i>
       <span class="sidebar-label">Templates</span>
     </a>
+    {% endif %}
   </nav>
 
   <!-- Footer : profil + actions -->

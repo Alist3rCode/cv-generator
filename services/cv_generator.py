@@ -71,23 +71,50 @@ def _fmt_date(d) -> str:
     return d.strftime("%m/%Y")
 
 
-def _replace_in_run(run, replacements: dict[str, str]) -> None:
-    """Remplace toutes les balises dans un run."""
-    for key, value in replacements.items():
-        if key in run.text:
-            run.text = run.text.replace(key, value or "")
-
-
 def _replace_in_paragraph(para, replacements: dict[str, str]) -> None:
-    """Remplace les balises dans tous les runs d'un paragraphe."""
-    for run in para.runs:
-        _replace_in_run(run, replacements)
+    """
+    Remplace les balises dans un paragraphe en gérant le split Word.
+
+    Word décompose souvent {{NOM}} en plusieurs runs (ex: '{{', 'NOM', '}}')
+    pour des raisons de formatage interne. On fusionne d'abord le texte de
+    tous les runs, on effectue les remplacements, puis on met le résultat
+    dans le premier run et on vide les autres (en conservant leur XML pour
+    ne pas casser la structure).
+    """
+    if not para.runs:
+        return
+
+    # Vérifier si une balise est présente (évite de toucher les paragraphes propres)
+    full_text = "".join(r.text for r in para.runs)
+    if not any(key in full_text for key in replacements):
+        return
+
+    # Appliquer tous les remplacements sur le texte fusionné
+    new_text = full_text
+    for key, value in replacements.items():
+        new_text = new_text.replace(key, value or "")
+
+    # Mettre le texte final dans le premier run, vider les autres
+    para.runs[0].text = new_text
+    for run in para.runs[1:]:
+        run.text = ""
 
 
 def _replace_in_doc(doc: Document, replacements: dict[str, str]) -> None:
     """Remplace les balises dans tous les paragraphes du document (hors tableaux)."""
     for para in doc.paragraphs:
         _replace_in_paragraph(para, replacements)
+
+
+def _replace_in_cell(cell, replacements: dict[str, str]) -> None:
+    """Remplace les balises dans tous les paragraphes d'une cellule."""
+    for para in cell.paragraphs:
+        _replace_in_paragraph(para, replacements)
+    # Récursion sur les tableaux imbriqués
+    for tbl in cell.tables:
+        for row in tbl.rows:
+            for c in row.cells:
+                _replace_in_cell(c, replacements)
 
 
 def _find_template_row(table, marker: str):
@@ -107,8 +134,7 @@ def _clone_row(row):
 def _fill_row(row, replacements: dict[str, str]) -> None:
     """Remplace les balises dans toutes les cellules d'une ligne."""
     for cell in row.cells:
-        for para in cell.paragraphs:
-            _replace_in_paragraph(para, replacements)
+        _replace_in_cell(cell, replacements)
 
 
 def _expand_table_section(doc: Document, marker: str, items: list[dict[str, str]]) -> None:

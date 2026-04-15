@@ -3,14 +3,49 @@ main.py — Point d'entrée FastAPI
 CV Generator App
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from database import init_db
+from database import init_db, SessionLocal
 from routers import auth, users, profile, experiences, formations, certifications, competences, templates, exports, admin
 
 app = FastAPI(title="CV Generator", version="1.0.0")
+
+
+class AdminContextMiddleware(BaseHTTPMiddleware):
+    """
+    Injecte request.state.is_admin pour chaque requête authentifiée.
+    Utilisé dans base.html pour afficher/masquer le menu Templates.
+    """
+    async def dispatch(self, request: Request, call_next):
+        request.state.is_admin = False
+        token = request.cookies.get("access_token")
+        if token:
+            try:
+                import uuid as _uuid
+                from jose import jwt as _jwt
+                from routers.auth import SECRET_KEY, ALGORITHM
+                from models import User, UserOrganisation, RoleEnum
+                payload = _jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                user_id = payload.get("sub")
+                if user_id:
+                    db = SessionLocal()
+                    try:
+                        uo = db.query(UserOrganisation).filter(
+                            UserOrganisation.user_id == _uuid.UUID(user_id),
+                            UserOrganisation.role == RoleEnum.admin,
+                        ).first()
+                        request.state.is_admin = uo is not None
+                    finally:
+                        db.close()
+            except Exception:
+                pass
+        return await call_next(request)
+
+
+app.add_middleware(AdminContextMiddleware)
 
 # Fichiers statiques (CSS, JS, images)
 app.mount("/static", StaticFiles(directory="static"), name="static")

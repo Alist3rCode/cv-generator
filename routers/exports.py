@@ -14,7 +14,7 @@ from database import get_db
 from models import (
     User, Language, Template, CVExport, ExportFormatEnum,
     Bio, Experience, Formation, Certification, Competence, Profile,
-    UserOrganisation,
+    UserOrganisation, ProfilLangue,
 )
 from routers.auth import require_user
 from services.cv_generator import generate_cv_docx, convert_docx_to_pdf
@@ -80,7 +80,8 @@ def generate_export(
         "experiences":    db.query(Experience).filter(Experience.user_id == current_user.id, Experience.language_id == lang_uuid).order_by(Experience.date_debut.desc()).all(),
         "formations":     db.query(Formation).filter(Formation.user_id == current_user.id, Formation.language_id == lang_uuid).order_by(Formation.date_debut.desc()).all(),
         "certifications": db.query(Certification).filter(Certification.user_id == current_user.id, Certification.language_id == lang_uuid).order_by(Certification.date_obtention.desc()).all(),
-        "competences":    db.query(Competence).filter(Competence.user_id == current_user.id, Competence.language_id == lang_uuid).all(),
+        "competences":     db.query(Competence).filter(Competence.user_id == current_user.id, Competence.language_id == lang_uuid).all(),
+        "profil_langues":  db.query(ProfilLangue).filter(ProfilLangue.user_id == current_user.id).order_by(ProfilLangue.created_at).all(),
     }
 
     export_id  = uuid.uuid4()
