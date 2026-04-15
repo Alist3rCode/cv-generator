@@ -241,19 +241,60 @@
 
     var today = new Date().toISOString().slice(0, 10);
 
-    var items = new vis.DataSet(raw.map(function(exp, i) {
-      var p = palettes[i % palettes.length];
-      return {
-        id: exp.id,
-        content: exp.entreprise || exp.titre_poste,
-        start: exp.date_debut,
-        end:   exp.date_fin || today,
-        style: 'background-color:' + p.bg + ';border-color:' + p.border + ';color:' + p.text + ';border-radius:5px;',
-        type: 'range',
-      };
-    }));
+    // Seuil : expérience < 60 jours → label externe (box) + barre fantôme (range)
+    var SHORT_DAYS = 60;
 
-    var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    var dataItems = [];
+    raw.forEach(function(exp, i) {
+      var p       = palettes[i % palettes.length];
+      var label   = exp.entreprise || exp.titre_poste;
+      var startMs = new Date(exp.date_debut).getTime();
+      var endMs   = new Date(exp.date_fin || today).getTime();
+      var durDays = (endMs - startMs) / 86400000;
+      var midDate = new Date((startMs + endMs) / 2).toISOString().slice(0, 10);
+
+      var rangeStyle = 'background-color:' + p.bg + ';border-color:' + p.border
+                     + ';color:' + p.text + ';border-radius:5px;';
+      var boxStyle   = 'background-color:' + p.bg + ';border-color:' + p.border
+                     + ';color:' + p.text + ';border-radius:4px;';
+      var tooltip    = label + '<br><small>' + exp.date_debut.slice(0,7)
+                     + ' → ' + (exp.date_fin ? exp.date_fin.slice(0,7) : 'présent') + '</small>';
+
+      if (durDays >= SHORT_DAYS) {
+        // Expérience longue : label dans la barre
+        dataItems.push({
+          id: exp.id,
+          content: label,
+          title: tooltip,
+          start: exp.date_debut,
+          end:   exp.date_fin || today,
+          style: rangeStyle,
+          type: 'range',
+        });
+      } else {
+        // Expérience courte : barre vide + bulle pointée au milieu
+        dataItems.push({
+          id: exp.id + '_bar',
+          content: '',
+          title: tooltip,
+          start: exp.date_debut,
+          end:   exp.date_fin || today,
+          style: rangeStyle + 'min-width:4px;',
+          type: 'range',
+          editable: false,
+        });
+        dataItems.push({
+          id: exp.id + '_box',
+          content: label,
+          title: tooltip,
+          start: midDate,
+          style: boxStyle,
+          type: 'box',
+        });
+      }
+    });
+
+    var items = new vis.DataSet(dataItems);
 
     var options = {
       stack: false,
@@ -261,24 +302,22 @@
       zoomable: false,
       selectable: false,
       orientation: { axis: 'bottom' },
-      height: '80px',
+      height: '110px',
       margin: { item: { horizontal: 2, vertical: 4 } },
       timeAxis: { scale: 'year', step: 1 },
       format: { minorLabels: { year: 'YYYY' }, majorLabels: {} },
       showMajorLabels: false,
       showMinorLabels: true,
       showCurrentTime: false,
-      tooltip: { followMouse: true },
+      tooltip: { followMouse: true, delay: 100 },
     };
 
     var tl = new vis.Timeline(container, items, options);
 
     // Adapter les couleurs de la grille au thème
     function applyTimelineTheme(dark) {
-      var bg   = dark ? '#1e1b4b' : '#ffffff';
-      var text = dark ? '#c7d2fe' : '#6b7280';
-      var border = dark ? '#312e81' : '#e5e7eb';
-      container.style.setProperty('--vis-background', bg);
+      var text   = dark ? '#c7d2fe' : '#6b7280';
+      var border = dark ? 'rgba(255,255,255,.08)' : '#e5e7eb';
       container.querySelectorAll('.vis-text').forEach(function(el) { el.style.color = text; });
       container.querySelectorAll('.vis-grid.vis-minor, .vis-grid.vis-major').forEach(function(el) { el.style.borderColor = border; });
     }

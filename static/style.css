@@ -311,18 +311,21 @@ body.has-sidebar {
 /* ── vis-timeline ── */
 .vis-timeline-wrap {
   width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--bs-border-color, #e5e7eb);
 }
-/* Masquer les labels de l'axe majeur (mois) */
-.vis-timeline-wrap .vis-label { display: none; }
-/* Fond adaptatif */
+/* Supprimer toutes les bordures du container */
 .vis-timeline-wrap .vis-timeline,
+.vis-timeline-wrap .vis-panel,
 .vis-timeline-wrap .vis-panel.vis-center,
-.vis-timeline-wrap .vis-panel.vis-bottom {
+.vis-timeline-wrap .vis-panel.vis-bottom,
+.vis-timeline-wrap .vis-panel.vis-top,
+.vis-timeline-wrap .vis-panel.vis-left,
+.vis-timeline-wrap .vis-panel.vis-right {
+  border: none !important;
+  background: transparent;
+}
+/* Fond adaptatif sur le panneau central */
+.vis-timeline-wrap .vis-panel.vis-center {
   background: var(--bs-body-bg);
-  border-color: var(--bs-border-color, #e5e7eb);
 }
 .vis-timeline-wrap .vis-text.vis-minor {
   color: var(--bs-secondary-color);
@@ -332,14 +335,22 @@ body.has-sidebar {
 .vis-timeline-wrap .vis-grid.vis-major {
   border-color: var(--bs-border-color, #e5e7eb);
 }
-/* Items : pas de box-shadow parasite */
+/* Items range */
 .vis-timeline-wrap .vis-item {
-  font-size: .75rem;
+  font-size: .72rem;
   font-weight: 600;
   border-width: 1px;
   padding: 2px 6px;
+  box-shadow: none;
 }
 .vis-timeline-wrap .vis-item.vis-selected { border-width: 2px; }
+/* Item box : ligne pointeur */
+.vis-timeline-wrap .vis-item.vis-box {
+  border-width: 1px;
+}
+.vis-timeline-wrap .vis-item.vis-box .vis-item-overflow { overflow: visible; }
+/* Ligne de pointage (dot-line) hérite de la couleur du label */
+.vis-timeline-wrap .vis-item.vis-line { border-width: 1px; }
 
 /* ── Nuage de mots flottant ── */
 .word-cloud-container {
