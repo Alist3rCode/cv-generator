@@ -99,10 +99,42 @@
           {# Panneau gauche — compétences assignées #}
           <div class="col-md-5">
             <div class="card h-100">
-              <div class="card-header py-2 bg-primary bg-opacity-10">
+              <div class="card-header py-2 bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
                 <strong><i class="bi bi-check2-circle"></i> Compétences de cette expérience</strong>
+                <button type="button" class="btn btn-outline-success btn-sm" id="btnShowInlineForm">
+                  <i class="bi bi-plus-circle"></i> Nouvelle
+                </button>
               </div>
               <div class="card-body p-2">
+                {# Mini-formulaire inline #}
+                <div id="inlineForm" class="mb-2 p-2 border rounded" style="display:none;background:var(--bs-tertiary-bg);">
+                  <div class="mb-2">
+                    <input type="text" id="inlineNom" class="form-control form-control-sm" placeholder="Nom de la compétence" />
+                  </div>
+                  <div class="row g-1 mb-2">
+                    <div class="col-6">
+                      <select id="inlineType" class="form-select form-select-sm">
+                        <option value="hard">Hard skill</option>
+                        <option value="soft">Soft skill</option>
+                      </select>
+                    </div>
+                    <div class="col-6">
+                      <select id="inlineNiveau" class="form-select form-select-sm">
+                        <option value="1">1 — Débutant</option>
+                        <option value="2">2 — Intermédiaire</option>
+                        <option value="3">3 — Avancé</option>
+                        <option value="4">4 — Expert</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-sm" id="btnInlineSubmit">
+                      <i class="bi bi-check"></i> Créer et ajouter
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnInlineCancel">Annuler</button>
+                  </div>
+                  <div id="inlineError" class="text-danger small mt-1" style="display:none;"></div>
+                </div>
                 <p class="small text-muted mb-1 fw-semibold">Hard Skills</p>
                 <div id="assignedHard" class="d-flex flex-wrap gap-1 mb-2 picker-zone" data-type="hard" data-side="assigned" style="min-height:40px;"></div>
                 <hr class="my-1">
@@ -135,39 +167,6 @@
                 <p class="small text-muted mb-1 fw-semibold">Soft Skills</p>
                 <div id="availableSoft" class="d-flex flex-wrap gap-1 picker-zone" data-type="soft" data-side="available" style="min-height:40px;"></div>
 
-                {# Mini-formulaire inline #}
-                <hr class="my-2">
-                <button type="button" class="btn btn-outline-success btn-sm w-100" id="btnShowInlineForm">
-                  <i class="bi bi-plus-circle"></i> Ajouter une compétence
-                </button>
-                <div id="inlineForm" class="mt-2 p-2 border rounded" style="display:none;background:var(--bs-tertiary-bg);">
-                  <div class="mb-2">
-                    <input type="text" id="inlineNom" class="form-control form-control-sm" placeholder="Nom de la compétence" />
-                  </div>
-                  <div class="row g-1 mb-2">
-                    <div class="col-6">
-                      <select id="inlineType" class="form-select form-select-sm">
-                        <option value="hard">Hard skill</option>
-                        <option value="soft">Soft skill</option>
-                      </select>
-                    </div>
-                    <div class="col-6">
-                      <select id="inlineNiveau" class="form-select form-select-sm">
-                        <option value="1">1 — Débutant</option>
-                        <option value="2">2 — Intermédiaire</option>
-                        <option value="3">3 — Avancé</option>
-                        <option value="4">4 — Expert</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-success btn-sm" id="btnInlineSubmit">
-                      <i class="bi bi-check"></i> Créer et ajouter
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-sm" id="btnInlineCancel">Annuler</button>
-                  </div>
-                  <div id="inlineError" class="text-danger small mt-1" style="display:none;"></div>
-                </div>
               </div>
             </div>
           </div>
