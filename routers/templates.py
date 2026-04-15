@@ -118,8 +118,16 @@ def toggle_template(tid: str, db: Session = Depends(get_db), current_user: User 
 
 @router.post("/{tid}/delete")
 def delete_template(tid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    from models import CVExport
     t = db.query(Template).filter(Template.id == uuid.UUID(tid)).first()
     if t:
+        # Supprimer les exports liés (template_id NOT NULL) avant de supprimer le template
+        exports = db.query(CVExport).filter(CVExport.template_id == t.id).all()
+        for export in exports:
+            if export.fichier_path:
+                Path(export.fichier_path).unlink(missing_ok=True)
+            db.delete(export)
+        db.flush()
         Path(t.fichier_path).unlink(missing_ok=True)
         db.delete(t)
         db.commit()
