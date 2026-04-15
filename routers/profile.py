@@ -45,9 +45,10 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
             Bio.language_id == default_lang.id,
         ).first()
 
-    all_exps   = db.query(Experience).filter(Experience.user_id == current_user.id, Experience.deleted_at == None).order_by(Experience.date_debut.desc()).all()
+    all_exps   = db.query(Experience).filter(Experience.user_id == current_user.id, Experience.deleted_at == None).order_by(Experience.date_debut.asc()).all()
     all_forms  = db.query(Formation).filter(Formation.user_id == current_user.id, Formation.deleted_at == None).order_by(Formation.date_debut.desc()).all()
     all_certs  = db.query(Certification).filter(Certification.user_id == current_user.id, Certification.deleted_at == None).order_by(Certification.date_obtention.desc()).all()
+    all_comps  = db.query(Competence).filter(Competence.user_id == current_user.id).all()
 
     def _dedup(items):
         seen, result = set(), []
@@ -57,15 +58,27 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
                 result.append(item)
         return result
 
+    from models import SkillTypeEnum
+    comps_dedup   = _dedup(all_comps)
+    hard_count    = sum(1 for c in comps_dedup if c.type == SkillTypeEnum.hard)
+    soft_count    = sum(1 for c in comps_dedup if c.type == SkillTypeEnum.soft)
+
+    exps_dedup = _dedup(all_exps)  # triées ASC pour la timeline
+
+    from datetime import date as _date
     return templates.TemplateResponse("profile/dashboard.html", {
-        "request":      request,
-        "current_user": current_user,
-        "completion":   completion,
-        "criteria":     criteria,
-        "bio":          bio,
-        "experiences":  _dedup(all_exps),
-        "formations":   _dedup(all_forms),
+        "request":        request,
+        "current_user":   current_user,
+        "completion":     completion,
+        "criteria":       criteria,
+        "bio":            bio,
+        "experiences":    list(reversed(exps_dedup)),   # DESC pour la liste résumé
+        "experiences_asc": exps_dedup,                  # ASC pour la timeline
+        "formations":     _dedup(all_forms),
         "certifications": _dedup(all_certs),
+        "hard_count":     hard_count,
+        "soft_count":     soft_count,
+        "now_year":       _date.today().year,
     })
 
 

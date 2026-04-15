@@ -4,43 +4,117 @@
 {% block content %}
 
 <!-- ====================================================
-     Barre du haut : 6 cartes (3x2) | donut + badges
+     Barre du haut : indicateurs + timeline | donut
 ===================================================== -->
-<div class="row g-3 mb-5 align-items-stretch">
+<div class="dashboard-header mb-5">
 
-  <!-- Colonne gauche : 6 cartes en grille 3x2 -->
-  <div class="col-lg-9">
-    <div class="row g-2 h-100">
-      {% set nav_cards = [
-        ("/profile/edit",     "bi-person-vcard",            "text-primary",   "border-primary",   "Profil & Bio",     "Présentation, contacts"),
-        ("/experiences/",     "bi-briefcase",               "text-success",   "border-success",   "Expériences",   "Missions, entreprises"),
-        ("/formations/",      "bi-mortarboard",             "text-info",      "border-info",      "Formations",       "Diplômes, cursus"),
-        ("/certifications/",  "bi-patch-check",             "text-warning",   "border-warning",   "Certifications",   "Certifications pro"),
-        ("/competences/",     "bi-stars",                   "text-secondary", "border-secondary", "Compétences",   "Hard & soft skills"),
-        ("/exports/",         "bi-file-earmark-arrow-down", "text-danger",    "border-danger",    "Exporter mon CV",  "DOCX ou PDF"),
-      ] %}
-      {% for href, icon, color, border, title, sub in nav_cards %}
-      <div class="col-4">
-        <a href="{{ href }}" class="card-clickable card h-100 {{ border }} shadow-sm text-decoration-none">
-          <div class="card-body text-center py-3 px-2">
-            <i class="bi {{ icon }} fs-2 {{ color }}"></i>
-            <div class="fw-semibold mt-1 small">{{ title }}</div>
-            <div class="text-muted" style="font-size:.72rem;">{{ sub }}</div>
-          </div>
-        </a>
+  <!-- Colonne gauche 75% : indicateurs + timeline -->
+  <div class="dashboard-left">
+
+    <!-- Ligne 1 : compteurs -->
+    <div class="dash-indicators">
+      <div class="dash-indicator">
+        <i class="bi bi-briefcase" style="color:#198754;"></i>
+        <span class="dash-indicator-count">{{ experiences | length }}</span>
+        <span class="dash-indicator-label">Expérience{{ 's' if experiences | length > 1 else '' }}</span>
       </div>
-      {% endfor %}
+      <div class="dash-indicator">
+        <i class="bi bi-mortarboard" style="color:#0dcaf0;"></i>
+        <span class="dash-indicator-count">{{ formations | length }}</span>
+        <span class="dash-indicator-label">Formation{{ 's' if formations | length > 1 else '' }}</span>
+      </div>
+      <div class="dash-indicator">
+        <i class="bi bi-patch-check" style="color:#ffc107;"></i>
+        <span class="dash-indicator-count">{{ certifications | length }}</span>
+        <span class="dash-indicator-label">Certification{{ 's' if certifications | length > 1 else '' }}</span>
+      </div>
+      <div class="dash-indicator">
+        <i class="bi bi-stars" style="color:#6366f1;"></i>
+        <span class="dash-indicator-count">{{ hard_count }}</span>
+        <span class="dash-indicator-label">Hard skills</span>
+      </div>
+      <div class="dash-indicator">
+        <i class="bi bi-emoji-smile" style="color:var(--bs-secondary-color);"></i>
+        <span class="dash-indicator-count">{{ soft_count }}</span>
+        <span class="dash-indicator-label">Soft skills</span>
+      </div>
     </div>
+
+    <!-- Ligne 2 : timeline des expériences -->
+    {% if experiences_asc %}
+    {# Calcul des bornes globales en Jinja #}
+    {% set ns = namespace(min_year=9999, max_year=0) %}
+    {% for exp in experiences_asc %}
+      {% set y1 = exp.date_debut.year %}
+      {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
+      {% if y1 < ns.min_year %}{% set ns.min_year = y1 %}{% endif %}
+      {% if y2 > ns.max_year %}{% set ns.max_year = y2 %}{% endif %}
+    {% endfor %}
+    {% set total_span = (ns.max_year - ns.min_year) if ns.max_year > ns.min_year else 1 %}
+    {% set palette = ['#6366f1','#818cf8','#a5b4fc'] %}
+
+    <div class="dash-timeline-wrap">
+      {# Barre de fond avec segments #}
+      <div class="tl-bar-bg">
+        {% for exp in experiences_asc %}
+          {% set y1 = exp.date_debut.year %}
+          {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
+          {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
+          {% set width_pct = ((y2 - y1) / total_span * 100) | round(3) %}
+          {% set color = palette[loop.index0 % 3] %}
+          <div class="tl-segment"
+               style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;background:{{ color }};"
+               title="{{ exp.entreprise }} ({{ exp.date_debut.year }}–{{ exp.date_fin.year if exp.date_fin else 'présent' }})">
+          </div>
+        {% endfor %}
+      </div>
+
+      {# Labels entreprises — un par segment, positionné sous la barre #}
+      <div class="tl-labels">
+        {% for exp in experiences_asc %}
+          {% set y1 = exp.date_debut.year %}
+          {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
+          {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
+          {% set width_pct = ((y2 - y1) / total_span * 100) | round(3) %}
+          <div class="tl-label"
+               style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;">
+            {{ exp.entreprise }}
+          </div>
+        {% endfor %}
+      </div>
+
+      {# Années : début de chaque segment + dernière année à droite.
+         Le JS masquera celles qui se chevauchent. #}
+      <div class="tl-years" id="tlYears">
+        {% for exp in experiences_asc %}
+          {% set y1 = exp.date_debut.year %}
+          {% set left_pct = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
+          <span class="tl-year" style="left:{{ left_pct }}%;" data-year="{{ y1 }}">{{ y1 }}</span>
+        {% endfor %}
+        {# Dernière année uniquement si différente du dernier début #}
+        {% if experiences_asc[-1].date_fin %}
+          {% set last_y = experiences_asc[-1].date_fin.year %}
+        {% else %}
+          {% set last_y = now_year %}
+        {% endif %}
+        {% if last_y != experiences_asc[-1].date_debut.year %}
+        <span class="tl-year tl-year--end" data-year="{{ last_y }}">{{ last_y }}</span>
+        {% endif %}
+      </div>
+
+    </div>
+    {% endif %}
+
   </div>
 
-  <!-- Colonne droite : donut + badges de gamification -->
-  <div class="col-lg-3 d-flex flex-column align-items-center justify-content-center gap-3">
+  <!-- Colonne droite 25% : donut + badges -->
+  <div class="dashboard-right">
     <div class="completion-wrapper">
       <canvas id="completionChart" width="130" height="130"></canvas>
       <div class="completion-label">{{ completion }}%</div>
       <div class="completion-sublabel">complété</div>
     </div>
-    <div class="d-flex flex-wrap gap-2 justify-content-center">
+    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
       {% set checks = [
         ("bio",        "bi-chat-left-text", "Bio"),
         ("experience", "bi-briefcase",      "Expérience"),
@@ -190,7 +264,37 @@
   // Mise a jour des couleurs quand le theme change
   window.__onThemeChange = function() {
     donutChart.data.datasets[0].backgroundColor = getChartColors();
-    donutChart.update('none'); // 'none' = sans animation pour un changement instantane
+    donutChart.update('none');
   };
+
+  // ── Timeline : masquer les années trop proches ──
+  (function() {
+    var container = document.getElementById('tlYears');
+    if (!container) return;
+
+    // Positionner la dernière année (end) à droite
+    var endEl = container.querySelector('.tl-year--end');
+    if (endEl) {
+      endEl.style.left  = '100%';
+      endEl.style.transform = 'translateX(-100%)';
+    }
+
+    // Attendre que le layout soit calculé
+    requestAnimationFrame(function() {
+      var spans = Array.from(container.querySelectorAll('.tl-year'));
+      var minGap = 28; // px minimum entre deux labels
+      var lastRight = -Infinity;
+
+      spans.forEach(function(el) {
+        var rect = el.getBoundingClientRect();
+        if (rect.left < lastRight + minGap) {
+          el.style.visibility = 'hidden';
+        } else {
+          el.style.visibility = 'visible';
+          lastRight = rect.right;
+        }
+      });
+    });
+  })();
 </script>
 {% endblock %}

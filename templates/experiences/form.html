@@ -140,7 +140,7 @@
                 <button type="button" class="btn btn-outline-success btn-sm w-100" id="btnShowInlineForm">
                   <i class="bi bi-plus-circle"></i> Ajouter une compétence
                 </button>
-                <div id="inlineForm" class="mt-2 p-2 border rounded bg-light" style="display:none;">
+                <div id="inlineForm" class="mt-2 p-2 border rounded" style="display:none;background:var(--bs-tertiary-bg);">
                   <div class="mb-2">
                     <input type="text" id="inlineNom" class="form-control form-control-sm" placeholder="Nom de la compétence" />
                   </div>
@@ -222,50 +222,12 @@
   inputs.forEach(function(el) { el.addEventListener('input', checkChanges); });
   quill.on('text-change', checkChanges);
 
-  // Autocomplete localisation via Nominatim (OpenStreetMap)
-  var locInput  = document.getElementById('locationInput');
-  var locList   = document.getElementById('locationSuggestions');
-  var locTimer  = null;
-
-  locInput.addEventListener('input', function() {
-    clearTimeout(locTimer);
-    var q = locInput.value.trim();
-    if (q.length < 2) { locList.style.display = 'none'; return; }
-    locTimer = setTimeout(function() {
-      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=' + encodeURIComponent(q), {
-        headers: { 'Accept-Language': 'fr' }
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(results) {
-        locList.innerHTML = '';
-        var seen = new Set();
-        results.forEach(function(r) {
-          var city    = r.address.city || r.address.town || r.address.village || r.address.county || r.display_name.split(',')[0];
-          var country = r.address.country || '';
-          var label   = city.trim() + (country ? ', ' + country : '');
-          if (seen.has(label)) return;
-          seen.add(label);
-          var li = document.createElement('li');
-          li.className = 'list-group-item list-group-item-action py-1 small';
-          li.style.cursor = 'pointer';
-          li.textContent  = label;
-          li.addEventListener('mousedown', function(e) {
-            e.preventDefault();
-            locInput.value = label;
-            locList.style.display = 'none';
-            checkChanges();
-          });
-          locList.appendChild(li);
-        });
-        locList.style.display = locList.children.length ? 'block' : 'none';
-      })
-      .catch(function() { locList.style.display = 'none'; });
-    }, 400);
-  });
-
-  document.addEventListener('click', function(e) {
-    if (!locList.contains(e.target) && e.target !== locInput) locList.style.display = 'none';
-  });
+  // ── Autocomplete localisation (Nominatim) ────────────────────────────
+  initLocationAutocomplete(
+    document.getElementById('locationInput'),
+    document.getElementById('locationSuggestions'),
+    checkChanges
+  );
 
   // ── Skill Picker ─────────────────────────────────────────────────────
 
