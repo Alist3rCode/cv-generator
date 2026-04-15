@@ -241,9 +241,13 @@
 
     var today = new Date().toISOString().slice(0, 10);
 
-    // Seuil : expérience < 60 jours → label externe (box dans groupe "labels")
-    //         sinon → label dans la barre (range dans groupe "bars")
-    var SHORT_DAYS = 60;
+    // Seuil dynamique : une expérience est "courte" si sa durée représente
+    // moins de 12 % de l'étendue totale de la timeline.
+    // Ex : timeline sur 10 ans → court si < ~14 mois ; sur 3 ans → court si < ~4 mois.
+    var allStarts = raw.map(function(e) { return new Date(e.date_debut).getTime(); });
+    var allEnds   = raw.map(function(e) { return new Date(e.date_fin || today).getTime(); });
+    var tlSpanMs  = Math.max.apply(null, allEnds) - Math.min.apply(null, allStarts);
+    var SHORT_MS  = tlSpanMs * 0.12;  // 12 % de l'étendue totale
 
     // Deux groupes : "bars" (ligne du bas) et "labels" (ligne du haut pour les courtes)
     var groups = new vis.DataSet([
@@ -259,7 +263,7 @@
       var label   = exp.entreprise || exp.titre_poste;
       var startMs = new Date(exp.date_debut).getTime();
       var endMs   = new Date(exp.date_fin || today).getTime();
-      var durDays = (endMs - startMs) / 86400000;
+      var durMs   = endMs - startMs;
       var midDate = new Date((startMs + endMs) / 2).toISOString().slice(0, 10);
 
       var baseStyle = 'background-color:' + p.bg + ';border-color:' + p.border
@@ -267,7 +271,7 @@
       var tooltip   = label + '<br><small>' + exp.date_debut.slice(0, 7)
                     + ' → ' + (exp.date_fin ? exp.date_fin.slice(0, 7) : 'présent') + '</small>';
 
-      if (durDays >= SHORT_DAYS) {
+      if (durMs >= SHORT_MS) {
         // Expérience longue : label dans la barre, groupe "bars"
         dataItems.push({
           id:      exp.id,
