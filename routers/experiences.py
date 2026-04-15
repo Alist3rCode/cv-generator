@@ -257,6 +257,35 @@ def update_experience(
     return RedirectResponse(url=f"/experiences/{exp_id}/edit?language_id={language_id}", status_code=303)
 
 
+@router.post("/{exp_id}/save-skills")
+def save_skills(
+    exp_id: str,
+    hard_skills_json: str = Form(""),
+    soft_skills_json: str = Form(""),
+    db: Session           = Depends(get_db),
+    current_user: User    = Depends(require_user),
+):
+    """Sauvegarde uniquement les compétences d'une expérience (auto-save AJAX)."""
+    from fastapi.responses import JSONResponse as _JSONResponse
+    source = db.query(Experience).filter(
+        Experience.id == uuid.UUID(exp_id), Experience.user_id == current_user.id
+    ).first()
+    if not source:
+        return _JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+
+    hard_skills = _parse_skills_json(hard_skills_json)
+    soft_skills = _parse_skills_json(soft_skills_json)
+
+    all_translations = db.query(Experience).filter(
+        Experience.gid == source.gid, Experience.user_id == current_user.id
+    ).all()
+    for t in all_translations:
+        t.hard_skills = hard_skills or None
+        t.soft_skills = soft_skills or None
+    db.commit()
+    return _JSONResponse({"ok": True})
+
+
 @router.post("/{exp_id}/soft-delete")
 def soft_delete_experience(exp_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     """Désactive l'expérience (soft delete) sans la supprimer de la BDD."""

@@ -1,5 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Certifications — CV Generator{% endblock %}
+{% block title %}Certifications — CV Generator
+{# Modale de confirmation soft-delete #}
+<div class="modal fade" id="softDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger"><i class="bi bi-trash"></i> Mettre à la corbeille</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Cet élément sera déplacé dans la <strong>corbeille</strong> et n'apparaîtra plus dans votre CV.</p>
+        <p class="text-muted small mb-0">Vous pourrez le restaurer depuis <a href="/admin/trash">la corbeille</a>.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <form id="softDeleteForm" method="post" action="" class="d-inline">
+          <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Mettre à la corbeille</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function softDelete(id, baseUrl) {
+  document.getElementById('softDeleteForm').action = baseUrl + id + '/soft-delete';
+  new bootstrap.Modal(document.getElementById('softDeleteModal')).show();
+}
+</script>
+{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -24,9 +52,7 @@
     </div>
     <div class="d-flex flex-column gap-2 ms-3">
       <a href="/certifications/{{ c.id }}/edit" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
-      <form method="post" action="/certifications/{{ c.id }}/delete" onsubmit="return confirm('Supprimer ?')">
-        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
-      </form>
+      <button type="button" class="btn btn-outline-danger btn-sm" onclick="softDelete('{{ c.id }}', '/certifications/')"><i class="bi bi-trash"></i></button>
     </div>
   </div>
 </div>

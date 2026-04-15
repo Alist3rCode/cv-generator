@@ -54,10 +54,12 @@ def list_templates(request: Request, db: Session = Depends(get_db), current_user
 @router.get("/upload", response_class=HTMLResponse)
 def upload_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     admin_orgs = _get_user_orgs_as_admin(current_user, db)
+    from datetime import date
     return templates_jinja.TemplateResponse("admin/template_upload.html", {
         "request": request,
         "current_user": current_user,
         "admin_orgs": admin_orgs,
+        "now": date.today(),
     })
 
 
@@ -79,12 +81,7 @@ async def upload_template(
             status_code=400,
         )
 
-    # Désactiver les anciens templates actifs de l'organisation
     org_id = uuid.UUID(organisation_id)
-    db.query(Template).filter(
-        Template.organisation_id == org_id,
-        Template.is_active == True,
-    ).update({"is_active": False})
 
     # Sauvegarder le fichier
     file_id   = uuid.uuid4()
@@ -116,8 +113,16 @@ def toggle_template(tid: str, db: Session = Depends(get_db), current_user: User 
 
 @router.post("/{tid}/delete")
 def delete_template(tid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    from models import CVExport
     t = db.query(Template).filter(Template.id == uuid.UUID(tid)).first()
     if t:
+        # Supprimer les exports liés (template_id NOT NULL) avant de supprimer le template
+        exports = db.query(CVExport).filter(CVExport.template_id == t.id).all()
+        for export in exports:
+            if export.fichier_path:
+                Path(export.fichier_path).unlink(missing_ok=True)
+            db.delete(export)
+        db.flush()
         Path(t.fichier_path).unlink(missing_ok=True)
         db.delete(t)
         db.commit()

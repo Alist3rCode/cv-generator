@@ -132,11 +132,18 @@
       <i class="bi bi-download sidebar-icon"></i>
       <span class="sidebar-label">Exporter CV</span>
     </a>
+    {% if request.state.is_admin %}
     <a href="/templates/"
        class="sidebar-link {% if '/templates' in request.url.path %}active{% endif %}">
       <i class="bi bi-layout-text-window sidebar-icon"></i>
       <span class="sidebar-label">Templates</span>
     </a>
+    <a href="/admin/users"
+       class="sidebar-link {% if '/admin/users' in request.url.path %}active{% endif %}">
+      <i class="bi bi-people sidebar-icon"></i>
+      <span class="sidebar-label">Utilisateurs</span>
+    </a>
+    {% endif %}
   </nav>
 
   <!-- Footer : profil + actions -->
@@ -153,11 +160,11 @@
     </a>
 
     <!-- Toggle thème -->
-    <div class="sidebar-link sidebar-theme-row">
+    <div class="sidebar-link sidebar-theme-row" style="cursor:pointer;" onclick="document.getElementById('themeToggle').click()">
       <i class="bi bi-moon-stars sidebar-icon" id="themeIcon"></i>
       <span class="sidebar-label">
         <span id="themeLabel">Thème sombre</span>
-        <div class="form-check form-switch mb-0 ms-auto">
+        <div class="form-check form-switch mb-0 ms-auto" onclick="event.stopPropagation()">
           <input class="form-check-input" type="checkbox" id="themeToggle" role="switch" />
         </div>
       </span>

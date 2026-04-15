@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Exporter mon CV — CV Generator{% endblock %}
+
+{% block content %}
+<h3 class="mb-4"><i class="bi bi-file-earmark-arrow-down"></i> Exporter mon CV</h3>
+
+{% if not active_templates %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle"></i>
+  Aucun template actif n'est disponible pour votre organisation.
+  Contactez un administrateur pour en importer un.
+</div>
+{% else %}
+
+<div class="card shadow-sm mb-5">
+  <div class="card-body">
+    <form method="post" action="/exports/generate">
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Template <span class="text-danger">*</span></label>
+          <select name="template_id" class="form-select" required id="templateSelect">
+            {% for t in active_templates %}
+            <option value="{{ t.id }}" data-nom="{{ t.nom }}">{{ t.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Langue <span class="text-danger">*</span></label>
+          <select name="language_id" class="form-select" required>
+            {% for lang in languages %}
+            <option value="{{ lang.id }}">{{ lang.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Format <span class="text-danger">*</span></label>
+          <select name="format" class="form-select" required>
+            <option value="docx">Word (.docx)</option>
+            <option value="pdf">PDF (.pdf)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Nom du fichier <span class="text-muted small fw-normal">(facultatif)</span></label>
+        <input type="text" name="nom" id="nomExport" class="form-control" />
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="generateBtn">
+        <i class="bi bi-download"></i> Générer et télécharger
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if previous_exports %}
+<h5 class="mb-3 mt-5">Exports récents</h5>
+<div class="card shadow-sm" id="exportsHistoryCard">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" id="exportsHistory">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Date</th>
+          <th>Format</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="exportsHistoryBody">
+        {% for e in previous_exports %}
+        <tr>
+          <td class="fw-semibold">{{ e.nom or '—' }}</td>
+          <td class="text-muted small">{{ e.generated_at.strftime('%d/%m/%Y %H:%M') if e.generated_at else '—' }}</td>
+          <td><span class="badge bg-secondary">{{ e.format.value.upper() }}</span></td>
+          <td>
+            <div class="d-flex gap-2">
+              {% if e.fichier_path %}
+              <a href="/exports/{{ e.id }}/download" class="btn btn-sm btn-outline-primary" title="Télécharger">
+                <i class="bi bi-download"></i>
+              </a>
+              {% else %}
+              <span class="text-muted small">En cours…</span>
+              {% endif %}
+              <button type="button" class="btn btn-sm btn-outline-danger"
+                      title="Supprimer"
+                      onclick="confirmDeleteExport('{{ e.id }}', '{{ e.nom | replace("'", "\\'") }}')">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modale de confirmation de suppression -->
+<div class="modal fade" id="deleteExportModal" tabindex="-1" aria-labelledby="deleteExportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-danger">
+        <h5 class="modal-title text-danger" id="deleteExportModalLabel">
+          <i class="bi bi-exclamation-triangle-fill"></i> Supprimer l'export
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <p>Vous êtes sur le point de supprimer <strong id="deleteExportName"></strong>.</p>
+        <div class="alert alert-danger d-flex gap-2 align-items-start mb-0">
+          <i class="bi bi-slash-circle-fill flex-shrink-0 mt-1"></i>
+          <div>
+            <strong>Cette action est irrémédiable.</strong><br>
+            Le fichier sera définitivement supprimé et ne pourra pas être récupéré.
+            Il vous faudra générer un nouvel export si vous en avez besoin.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> Annuler
+        </button>
+        <form id="deleteExportForm" method="post" action="">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash"></i> Supprimer définitivement
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Soumission du formulaire de génération via fetch ───────────────────────
+(function() {
+  var form = document.querySelector('form[action="/exports/generate"]');
+  var btn  = document.getElementById('generateBtn');
+  if (!form) return;
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // État chargement
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération en cours…';
+
+    fetch('/exports/generate', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'fetch' },
+      body: new FormData(form),
+    })
+    .then(function(r) {
+      if (!r.ok) throw new Error('Erreur serveur');
+      return r.json();
+    })
+    .then(function(data) {
+      // Déclencher le téléchargement via un lien temporaire
+      var a = document.createElement('a');
+      a.href = data.download_url;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Injecter la nouvelle ligne dans l'historique
+      _prependExportRow(data);
+    })
+    .catch(function() {
+      alert('Une erreur est survenue lors de la génération.');
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-download"></i> Générer et télécharger';
+    });
+  });
+
+  function _prependExportRow(data) {
+    // Créer le tableau s'il n'existe pas encore
+    var section = document.getElementById('exportsHistory');
+    if (!section) {
+      // Construire la section entière
+      var wrapper = document.createElement('div');
+      wrapper.innerHTML = [
+        '<h5 class="mb-3 mt-5">Exports récents</h5>',
+        '<div class="card shadow-sm" id="exportsHistoryCard">',
+        '  <div class="table-responsive">',
+        '    <table class="table table-hover align-middle mb-0" id="exportsHistory">',
+        '      <thead><tr><th>Nom</th><th>Date</th><th>Format</th><th>Actions</th></tr></thead>',
+        '      <tbody id="exportsHistoryBody"></tbody>',
+        '    </table>',
+        '  </div>',
+        '</div>',
+      ].join('');
+      // Insérer après le formulaire card
+      var formCard = document.querySelector('.card.shadow-sm.mb-5');
+      if (formCard && formCard.parentNode) {
+        formCard.parentNode.insertBefore(wrapper, formCard.nextSibling);
+      } else {
+        document.querySelector('.main-inner, main').appendChild(wrapper);
+      }
+    }
+
+    var tbody = document.getElementById('exportsHistoryBody');
+    if (!tbody) return;
+
+    var badge = data.format === 'pdf'
+      ? '<span class="badge bg-danger">PDF</span>'
+      : '<span class="badge bg-secondary">DOCX</span>';
+
+    var safeName = data.nom.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+
+    var tr = document.createElement('tr');
+    tr.innerHTML = [
+      '<td class="fw-semibold">' + safeName + '</td>',
+      '<td class="text-muted small">' + data.generated_at + '</td>',
+      '<td>' + badge + '</td>',
+      '<td>',
+      '  <div class="d-flex gap-2">',
+      '    <a href="' + data.download_url + '" class="btn btn-sm btn-outline-primary" title="Télécharger">',
+      '      <i class="bi bi-download"></i>',
+      '    </a>',
+      '    <button type="button" class="btn btn-sm btn-outline-danger" title="Supprimer"',
+      '            onclick="confirmDeleteExport(\'' + data.export_id + '\', \'' + safeName.replace(/'/g, "\\'") + '\')">',
+      '      <i class="bi bi-trash"></i>',
+      '    </button>',
+      '  </div>',
+      '</td>',
+    ].join('');
+
+    tbody.insertBefore(tr, tbody.firstChild);
+  }
+})();
+
+var _deleteExportModal = null;
+
+function confirmDeleteExport(exportId, nom) {
+  document.getElementById('deleteExportName').textContent = nom || 'cet export';
+  document.getElementById('deleteExportForm').action = '/exports/' + exportId + '/delete';
+  if (!_deleteExportModal) {
+    _deleteExportModal = new bootstrap.Modal(document.getElementById('deleteExportModal'));
+  }
+  _deleteExportModal.show();
+}
+
+(function() {
+  var templateSelect = document.getElementById('templateSelect');
+  var nomInput       = document.getElementById('nomExport');
+  if (!templateSelect || !nomInput) return;
+
+  function updateHint() {
+    var opt  = templateSelect.options[templateSelect.selectedIndex];
+    var nom  = opt ? opt.dataset.nom : '';
+    var now  = new Date();
+    var dd   = String(now.getDate()).padStart(2, '0');
+    var mm   = String(now.getMonth() + 1).padStart(2, '0');
+    var yyyy = now.getFullYear();
+    var hh   = String(now.getHours()).padStart(2, '0');
+    var min  = String(now.getMinutes()).padStart(2, '0');
+    nomInput.placeholder = nom + ' - ' + dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
+  }
+
+  templateSelect.addEventListener('change', updateHint);
+  updateHint();
+})();
+</script>
+{% endblock %}

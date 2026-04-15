@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h3><i class="bi bi-layout-text-window"></i> Templates Word (Admin)</h3>
+  <h3><i class="bi bi-layout-text-window"></i> Templates Word</h3>
   <a href="/templates/upload" class="btn btn-success"><i class="bi bi-upload"></i> Importer un template</a>
 </div>
 
@@ -45,33 +45,121 @@
 </div>
 {% endfor %}
 
-<div class="card mt-4 bg-light">
+<!-- Template de base téléchargeable -->
+<div class="alert alert-secondary d-flex align-items-center gap-3 mt-4 shadow-sm">
+  <span class="badge bg-secondary rounded-circle fs-6" style="width:2rem;height:2rem;line-height:2rem;text-align:center;">?</span>
+  <div class="flex-grow-1">
+    <strong>Vous débutez avec les templates ?</strong>
+    Téléchargez le fichier modèle de base (.docx) contenant toutes les balises prêtes à l'emploi,
+    puis personnalisez-le dans Word avant de l'importer ici.
+  </div>
+  <a href="/static/template_base.docx" download class="btn btn-outline-secondary btn-sm text-nowrap">
+    <i class="bi bi-download"></i> Télécharger le modèle
+  </a>
+</div>
+
+<!-- Référence des balises -->
+<div class="card mt-3 shadow-sm">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-info-circle"></i> Référence des balises
+  </div>
   <div class="card-body">
-    <h6><i class="bi bi-info-circle"></i> Balises disponibles pour vos templates Word</h6>
-    <div class="row mt-2">
-      <div class="col-md-4">
-        <strong>Données personnelles</strong>
-        <ul class="small mt-1">
-          <li><code>{{"{{"}}NOM{{"}}"}}</code> <code>{{"{{"}}PRENOM{{"}}"}}</code></li>
-          <li><code>{{"{{"}}EMAIL{{"}}"}}</code> <code>{{"{{"}}TELEPHONE{{"}}"}}</code></li>
-          <li><code>{{"{{"}}LINKEDIN{{"}}"}}</code> <code>{{"{{"}}BIO{{"}}"}}</code></li>
-        </ul>
+
+    <div class="row g-4">
+
+      <!-- Données personnelles -->
+      <div class="col-md-6 col-lg-4">
+        <h6 class="text-muted text-uppercase small mb-2">Données personnelles</h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td><code>{{"{{"}}NOM{{"}}"}}</code></td><td class="text-muted small">Nom de famille</td></tr>
+            <tr><td><code>{{"{{"}}PRENOM{{"}}"}}</code></td><td class="text-muted small">Prénom</td></tr>
+            <tr><td><code>{{"{{"}}POSTE{{"}}"}}</code></td><td class="text-muted small">Titre / poste professionnel</td></tr>
+            <tr><td><code>{{"{{"}}EMAIL{{"}}"}}</code></td><td class="text-muted small">Adresse email</td></tr>
+            <tr><td><code>{{"{{"}}TELEPHONE{{"}}"}}</code></td><td class="text-muted small">Téléphone</td></tr>
+            <tr><td><code>{{"{{"}}LINKEDIN{{"}}"}}</code></td><td class="text-muted small">URL LinkedIn</td></tr>
+            <tr><td><code>{{"{{"}}BIO{{"}}"}}</code></td><td class="text-muted small">Texte de présentation</td></tr>
+            <tr><td><code>{{"{{"}}TRIGRAMME{{"}}"}}</code></td><td class="text-muted small">Ex : YLO (1re lettre prénom + 2 premières du nom)</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="col-md-4">
-        <strong>Sections répétées (tableaux)</strong>
-        <ul class="small mt-1">
-          <li>Exp : <code>{{"{{"}}EXP_TITRE{{"}}"}}</code> <code>{{"{{"}}EXP_ENTREPRISE{{"}}"}}</code>...</li>
-          <li>Form : <code>{{"{{"}}FORM_DIPLOME{{"}}"}}</code> <code>{{"{{"}}FORM_ETAB{{"}}"}}</code>...</li>
-          <li>Cert : <code>{{"{{"}}CERT_TITRE{{"}}"}}</code> <code>{{"{{"}}CERT_ORG{{"}}"}}</code>...</li>
-        </ul>
+
+      <!-- Expériences -->
+      <div class="col-md-6 col-lg-4">
+        <h6 class="text-muted text-uppercase small mb-2">Expériences <span class="badge bg-secondary">tableau</span></h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td><code>{{"{{"}}EXP_TITRE{{"}}"}}</code></td><td class="text-muted small">Titre du poste</td></tr>
+            <tr><td><code>{{"{{"}}EXP_ENTREPRISE{{"}}"}}</code></td><td class="text-muted small">Entreprise</td></tr>
+            <tr><td><code>{{"{{"}}EXP_LOCATION{{"}}"}}</code></td><td class="text-muted small">Localisation</td></tr>
+            <tr><td><code>{{"{{"}}EXP_DEBUT{{"}}"}}</code></td><td class="text-muted small">Date de début</td></tr>
+            <tr><td><code>{{"{{"}}EXP_FIN{{"}}"}}</code></td><td class="text-muted small">Date de fin (ou "Présent")</td></tr>
+            <tr><td><code>{{"{{"}}EXP_SUMMARY{{"}}"}}</code></td><td class="text-muted small">Résumé de projet</td></tr>
+            <tr><td><code>{{"{{"}}EXP_DESC{{"}}"}}</code></td><td class="text-muted small">Description complète</td></tr>
+            <tr><td><code>{{"{{"}}EXP_HARD_TITRE{{"}}"}}</code></td><td class="text-muted small">"Environnement Technique : " (si présent)</td></tr>
+            <tr><td><code>{{"{{"}}EXP_HARD_NOM{{"}}"}}</code></td><td class="text-muted small">Hard skills liés, séparés par " , "</td></tr>
+            <tr><td><code>{{"{{"}}EXP_SOFT_TITRE{{"}}"}}</code></td><td class="text-muted small">"Environnement Fonctionnel : " (si présent)</td></tr>
+            <tr><td><code>{{"{{"}}EXP_SOFT_NOM{{"}}"}}</code></td><td class="text-muted small">Soft skills liés, séparés par " , "</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="col-md-4">
-        <strong>Compétences (tableaux)</strong>
-        <ul class="small mt-1">
-          <li>Hard : <code>{{"{{"}}HARD_NOM{{"}}"}}</code> <code>{{"{{"}}HARD_NIVEAU{{"}}"}}</code></li>
-          <li>Soft : <code>{{"{{"}}SOFT_NOM{{"}}"}}</code> <code>{{"{{"}}SOFT_NIVEAU{{"}}"}}</code></li>
-        </ul>
+
+      <!-- Formations & Certifications -->
+      <div class="col-md-6 col-lg-4">
+        <h6 class="text-muted text-uppercase small mb-2">Formations <span class="badge bg-secondary">tableau</span></h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td><code>{{"{{"}}FORM_DIPLOME{{"}}"}}</code></td><td class="text-muted small">Diplôme</td></tr>
+            <tr><td><code>{{"{{"}}FORM_ETAB{{"}}"}}</code></td><td class="text-muted small">Établissement</td></tr>
+            <tr><td><code>{{"{{"}}FORM_DEBUT{{"}}"}}</code></td><td class="text-muted small">Date de début</td></tr>
+            <tr><td><code>{{"{{"}}FORM_VILLE{{"}}"}}</code></td><td class="text-muted small">Ville</td></tr>
+            <tr><td><code>{{"{{"}}FORM_FIN{{"}}"}}</code></td><td class="text-muted small">Date de fin</td></tr>
+          </tbody>
+        </table>
+
+        <h6 class="text-muted text-uppercase small mb-2 mt-3">Certifications <span class="badge bg-secondary">tableau</span></h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td><code>{{"{{"}}CERT_TITRE{{"}}"}}</code></td><td class="text-muted small">Titre</td></tr>
+            <tr><td><code>{{"{{"}}CERT_ORG{{"}}"}}</code></td><td class="text-muted small">Organisme</td></tr>
+            <tr><td><code>{{"{{"}}CERT_DATE{{"}}"}}</code></td><td class="text-muted small">Date d'obtention</td></tr>
+            <tr><td><code>{{"{{"}}CERT_FIN{{"}}"}}</code></td><td class="text-muted small">Expiration (ou "pas d'expiration")</td></tr>
+          </tbody>
+        </table>
       </div>
+
+      <!-- Compétences -->
+      <div class="col-md-6 col-lg-4">
+        <h6 class="text-muted text-uppercase small mb-2">Hard skills <span class="badge bg-secondary">tableau</span></h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td><code>{{"{{"}}HARD_NOM{{"}}"}}</code></td><td class="text-muted small">Nom</td></tr>
+            <tr><td><code>{{"{{"}}HARD_NIVEAU{{"}}"}}</code></td><td class="text-muted small">Libellé niveau (ex : Expert)</td></tr>
+            <tr><td><code>{{"{{"}}HARD_FAMILLE{{"}}"}}</code></td><td class="text-muted small">Famille de compétence</td></tr>
+          </tbody>
+        </table>
+
+        <h6 class="text-muted text-uppercase small mb-2 mt-3">Soft skills <span class="badge bg-secondary">tableau</span></h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td><code>{{"{{"}}SOFT_NOM{{"}}"}}</code></td><td class="text-muted small">Nom</td></tr>
+            <tr><td><code>{{"{{"}}SOFT_NIVEAU{{"}}"}}</code></td><td class="text-muted small">Libellé niveau (ex : Intermédiaire)</td></tr>
+            <tr><td><code>{{"{{"}}SOFT_FAMILLE{{"}}"}}</code></td><td class="text-muted small">Famille de compétence</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Langues -->
+      <div class="col-md-6 col-lg-4">
+        <h6 class="text-muted text-uppercase small mb-2">Langues parlées <span class="badge bg-secondary">tableau</span></h6>
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td><code>{{"{{"}}LNG_NOM{{"}}"}}</code></td><td class="text-muted small">Nom (ex : Anglais)</td></tr>
+            <tr><td><code>{{"{{"}}LNG_NIVEAU{{"}}"}}</code></td><td class="text-muted small">Code + libellé CEFR (ex : C1 — Autonome)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
     </div>
   </div>
 </div>

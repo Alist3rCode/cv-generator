@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Gestion des utilisateurs — CV Generator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3><i class="bi bi-people"></i> Utilisateurs</h3>
+  <span class="text-muted small">{{ total }} utilisateur{{ 's' if total > 1 else '' }}</span>
+</div>
+
+<!-- Barre de recherche -->
+<form method="get" action="/admin/users" class="mb-4">
+  <div class="input-group">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" name="q" class="form-control" placeholder="Rechercher par nom, prénom ou email…"
+           value="{{ q }}" autofocus />
+    {% if q %}
+    <a href="/admin/users" class="btn btn-outline-secondary" title="Effacer">
+      <i class="bi bi-x-lg"></i>
+    </a>
+    {% endif %}
+    <button type="submit" class="btn btn-outline-primary">Rechercher</button>
+  </div>
+</form>
+
+<!-- Liste -->
+{% if not users %}
+<div class="alert alert-info">Aucun utilisateur trouvé{% if q %} pour « {{ q }} »{% endif %}.</div>
+{% else %}
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Nom</th>
+          <th>Email</th>
+          <th class="text-center">Admin</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        {% set uo_list = user_org_map.get(u.id | string, []) %}
+        {% set is_admin = uo_list | selectattr('role.value', 'equalto', 'admin') | list | length > 0 %}
+        <tr>
+          <td>
+            <span class="fw-semibold">{{ u.nom }} {{ u.prenom }}</span>
+            {% if u.id == current_user.id %}
+            <span class="badge bg-secondary ms-1">Vous</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ u.email }}</td>
+          <td class="text-center">
+            <div class="form-check form-switch d-flex justify-content-center mb-0">
+              <input
+                class="form-check-input admin-toggle"
+                type="checkbox"
+                role="switch"
+                data-user-id="{{ u.id }}"
+                {% if is_admin %}checked{% endif %}
+                {% if u.id == current_user.id %}disabled title="Vous ne pouvez pas modifier votre propre rôle"{% endif %}
+              />
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if pages > 1 %}
+<nav class="mt-4">
+  <ul class="pagination justify-content-center">
+    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+      <a class="page-link" href="?q={{ q }}&page={{ page - 1 }}"><i class="bi bi-chevron-left"></i></a>
+    </li>
+    {% for p in range(1, pages + 1) %}
+    <li class="page-item {% if p == page %}active{% endif %}">
+      <a class="page-link" href="?q={{ q }}&page={{ p }}">{{ p }}</a>
+    </li>
+    {% endfor %}
+    <li class="page-item {% if page >= pages %}disabled{% endif %}">
+      <a class="page-link" href="?q={{ q }}&page={{ page + 1 }}"><i class="bi bi-chevron-right"></i></a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+{% endif %}
+
+<script>
+document.querySelectorAll('.admin-toggle').forEach(function(toggle) {
+  toggle.addEventListener('change', function() {
+    var userId = this.dataset.userId;
+    var checked = this.checked;
+    this.disabled = true;
+
+    fetch('/admin/users/' + userId + '/toggle-admin', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        toggle.checked  = data.is_admin;
+        toggle.disabled = false;
+      })
+      .catch(function() {
+        toggle.checked  = !checked;  // rollback
+        toggle.disabled = false;
+        alert('Erreur lors de la mise à jour du rôle.');
+      });
+  });
+});
+</script>
+{% endblock %}

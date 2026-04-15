@@ -330,6 +330,54 @@
     document.getElementById('softSkillsJson').value = JSON.stringify(Array.from(assignedSoftGids));
   }
 
+  // ── Auto-save compétences ────────────────────────────────────────────
+  var _saveSkillsTimer = null;
+  var _skillsSaveIndicator = null;
+
+  function _getOrCreateIndicator() {
+    if (!_skillsSaveIndicator) {
+      _skillsSaveIndicator = document.createElement('span');
+      _skillsSaveIndicator.style.cssText = 'font-size:0.78rem;margin-left:8px;transition:opacity 0.4s;';
+      var label = document.querySelector('label.fw-semibold');
+      if (label) label.appendChild(_skillsSaveIndicator);
+    }
+    return _skillsSaveIndicator;
+  }
+
+  function saveSkillsAuto() {
+    {% if not source_id %}return;{% endif %}  // Pas d'auto-save en mode création
+    clearTimeout(_saveSkillsTimer);
+    _saveSkillsTimer = setTimeout(function() {
+      var expId = '{{ source_id }}';
+      var fd = new FormData();
+      fd.append('hard_skills_json', JSON.stringify(Array.from(assignedHardGids)));
+      fd.append('soft_skills_json', JSON.stringify(Array.from(assignedSoftGids)));
+
+      var ind = _getOrCreateIndicator();
+      ind.textContent = '⏳ Sauvegarde…';
+      ind.style.color = 'var(--bs-secondary-color)';
+      ind.style.opacity = '1';
+
+      fetch('/experiences/' + expId + '/save-skills', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.ok) {
+            ind.textContent = '✓ Sauvegardé';
+            ind.style.color = 'var(--bs-success-text-emphasis, #198754)';
+            setTimeout(function() { ind.style.opacity = '0'; }, 2000);
+          } else {
+            ind.textContent = '✗ Erreur';
+            ind.style.color = 'var(--bs-danger-text-emphasis, #dc3545)';
+          }
+        })
+        .catch(function() {
+          var ind2 = _getOrCreateIndicator();
+          ind2.textContent = '✗ Erreur réseau';
+          ind2.style.color = 'var(--bs-danger-text-emphasis, #dc3545)';
+        });
+    }, 400);
+  }
+
   function moveToAssigned(gid) {
     var skill = skillByGid[gid];
     if (!skill) return;
@@ -337,6 +385,7 @@
     else assignedSoftGids.add(gid);
     renderAll();
     syncHiddenInputs();
+    saveSkillsAuto();
   }
 
   function moveToAvailable(gid) {
@@ -344,6 +393,7 @@
     assignedSoftGids.delete(gid);
     renderAll();
     syncHiddenInputs();
+    saveSkillsAuto();
   }
 
   // Bouton → (retirer de assigné)
@@ -419,6 +469,7 @@
         }
         renderAll();
         syncHiddenInputs();
+        saveSkillsAuto();
         // Réinitialiser le formulaire inline
         document.getElementById('inlineNom').value = '';
         inlineDiv.style.display = 'none';

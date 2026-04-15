@@ -26,16 +26,83 @@
         <input type="email" class="form-control" value="{{ current_user.email }}" disabled />
       </div>
       <div class="mb-3">
-        <label class="form-label">Téléphone</label>
-        <input type="tel" name="telephone" class="form-control"
-               value="{{ profile.telephone if profile and profile.telephone else '' }}"
-               placeholder="+33 6 00 00 00 00" />
+        <label class="form-label">Poste / Titre professionnel</label>
+        <input type="text" name="poste" class="form-control"
+               value="{{ profile.poste if profile and profile.poste else '' }}"
+               placeholder="ex : Consultant Senior Data & IA" />
       </div>
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Téléphone</label>
+          <input type="tel" name="telephone" class="form-control"
+                 value="{{ profile.telephone if profile and profile.telephone else '' }}"
+                 placeholder="+33 6 00 00 00 00" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">URL LinkedIn</label>
+          <input type="url" name="linkedin_url" class="form-control"
+                 value="{{ profile.linkedin_url if profile and profile.linkedin_url else '' }}"
+                 placeholder="https://linkedin.com/in/..." />
+        </div>
+      </div>
+
+      <hr />
+
+      <!-- Langues parlées -->
       <div class="mb-4">
-        <label class="form-label">URL LinkedIn</label>
-        <input type="url" name="linkedin_url" class="form-control"
-               value="{{ profile.linkedin_url if profile and profile.linkedin_url else '' }}"
-               placeholder="https://linkedin.com/in/..." />
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label fw-semibold mb-0">
+            <i class="bi bi-translate"></i> Langues parlées
+          </label>
+          <button type="button" class="btn btn-sm btn-outline-success" id="addLangueBtn">
+            <i class="bi bi-plus-circle"></i> Ajouter
+          </button>
+        </div>
+        <div id="languesList">
+          {% for pl in profil_langues %}
+          <div class="langue-row row g-2 mb-2 align-items-center">
+            <input type="hidden" name="langue_ids" value="{{ pl.id }}" />
+            <div class="col">
+              <input type="text" name="langue_noms" class="form-control form-control-sm"
+                     value="{{ pl.nom }}" placeholder="ex : Anglais" required />
+            </div>
+            <div class="col-auto">
+              <select name="langue_niveaux" class="form-select form-select-sm">
+                {% for code, label in cefr_levels %}
+                <option value="{{ code }}" {% if pl.niveau.value == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-auto">
+              <button type="button" class="btn btn-sm btn-outline-danger remove-langue-btn">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <!-- Template d'une ligne vide (masquée, clonée par JS) -->
+        <template id="langueRowTpl">
+          <div class="langue-row row g-2 mb-2 align-items-center">
+            <input type="hidden" name="langue_ids" value="" />
+            <div class="col">
+              <input type="text" name="langue_noms" class="form-control form-control-sm"
+                     placeholder="ex : Anglais" />
+            </div>
+            <div class="col-auto">
+              <select name="langue_niveaux" class="form-select form-select-sm">
+                {% for code, label in cefr_levels %}
+                <option value="{{ code }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-auto">
+              <button type="button" class="btn btn-sm btn-outline-danger remove-langue-btn">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+        </template>
       </div>
 
       <hr />
@@ -76,28 +143,53 @@
 
 <script>
 (function() {
+  // ── Ajout / suppression de lignes de langue ──────────────────────────────
+  const languesList  = document.getElementById('languesList');
+  const addLangueBtn = document.getElementById('addLangueBtn');
+  const langueRowTpl = document.getElementById('langueRowTpl');
+
+  function bindRemoveBtn(row) {
+    row.querySelector('.remove-langue-btn').addEventListener('click', function() {
+      row.remove();
+      checkChanges();
+    });
+  }
+
+  // Lier les boutons sur les lignes existantes
+  languesList.querySelectorAll('.langue-row').forEach(bindRemoveBtn);
+
+  addLangueBtn.addEventListener('click', function() {
+    const clone = langueRowTpl.content.cloneNode(true).querySelector('.langue-row');
+    bindRemoveBtn(clone);
+    languesList.appendChild(clone);
+    clone.querySelector('input[name="langue_noms"]').focus();
+    checkChanges();
+  });
+
+  // ── Détection des changements ─────────────────────────────────────────────
   const form    = document.getElementById('profileForm');
   const saveBtn = document.getElementById('saveBtn');
   if (!form || !saveBtn) return;
 
-  const inputs = form.querySelectorAll('input:not([disabled]), textarea:not([disabled])');
-  inputs.forEach(el => { el.dataset.original = el.value; });
+  const staticInputs = form.querySelectorAll('input:not([disabled]), textarea:not([disabled])');
+  staticInputs.forEach(el => { el.dataset.original = el.value; });
 
   function checkChanges() {
-    const changed = [...inputs].some(el => el.value !== el.dataset.original);
+    const allInputs = form.querySelectorAll('input:not([disabled]), textarea:not([disabled]), select');
+    const changed = [...allInputs].some(el => el.dataset.original === undefined || el.value !== el.dataset.original);
     if (changed) {
       saveBtn.classList.replace('btn-outline-secondary', 'btn-primary');
-      // Marquer l'onglet actif comme non sauvegardé
       document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.add('lang-unsaved'));
-    window.__formDirty = true;
+      window.__formDirty = true;
     } else {
       saveBtn.classList.replace('btn-primary', 'btn-outline-secondary');
       document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.remove('lang-unsaved'));
-    window.__formDirty = false;
+      window.__formDirty = false;
     }
   }
 
-  inputs.forEach(el => el.addEventListener('input', checkChanges));
+  staticInputs.forEach(el => el.addEventListener('input', checkChanges));
+  form.addEventListener('change', checkChanges);
 })();
 </script>
 {{ unsaved_guard("profileForm") }}
