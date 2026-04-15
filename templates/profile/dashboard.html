@@ -312,13 +312,12 @@
     var items = new vis.DataSet(dataItems);
 
     var options = {
-      stack:     false,
+      stack:     true,
       moveable:  false,
       zoomable:  false,
       selectable: false,
       orientation: { axis: 'bottom' },
-      // Hauteur adaptée : si des exp courtes existent, on a 2 lignes
-      height: hasShort ? '150px' : '90px',
+      height: null,  // auto : s'adapte au nombre de lignes stackées
       margin: { item: { horizontal: 2, vertical: 4 } },
       timeAxis: { scale: 'year', step: 1 },
       format: { minorLabels: { year: 'YYYY' }, majorLabels: {} },
