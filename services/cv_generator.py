@@ -228,6 +228,12 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
     for c in profile.get("competences", []):
         comp_by_gid[str(c.gid)] = c
 
+    # ── Trigramme : 1ère lettre prénom + 2 premières lettres nom (majuscules) ──
+    trigramme = (
+        (user.prenom[:1] if user.prenom else "") +
+        (user.nom[:2]    if user.nom    else "")
+    ).upper()
+
     # ── Remplacements simples ──
     simple = {
         "{{NOM}}":       user.nom,
@@ -236,7 +242,8 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
         "{{TELEPHONE}}": (prof.telephone if prof else "") or "",
         "{{LINKEDIN}}":  (prof.linkedin_url if prof else "") or "",
         "{{POSTE}}":     (prof.poste if prof else "") or "",
-        "{{BIO}}":       (bio.texte if bio else "") or "",
+        "{{BIO}}":        (bio.texte if bio else "") or "",
+        "{{TRIGRAMME}}":  trigramme,
     }
     _replace_in_doc(doc, simple)
 

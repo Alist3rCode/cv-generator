@@ -45,8 +45,21 @@
 </div>
 {% endfor %}
 
+<!-- Template de base téléchargeable -->
+<div class="alert alert-secondary d-flex align-items-center gap-3 mt-4 shadow-sm">
+  <span class="badge bg-secondary rounded-circle fs-6" style="width:2rem;height:2rem;line-height:2rem;text-align:center;">?</span>
+  <div class="flex-grow-1">
+    <strong>Vous débutez avec les templates ?</strong>
+    Téléchargez le fichier modèle de base (.docx) contenant toutes les balises prêtes à l'emploi,
+    puis personnalisez-le dans Word avant de l'importer ici.
+  </div>
+  <a href="/static/template_base.docx" download class="btn btn-outline-secondary btn-sm text-nowrap">
+    <i class="bi bi-download"></i> Télécharger le modèle
+  </a>
+</div>
+
 <!-- Référence des balises -->
-<div class="card mt-4 shadow-sm">
+<div class="card mt-3 shadow-sm">
   <div class="card-header fw-semibold">
     <i class="bi bi-info-circle"></i> Référence des balises
   </div>
@@ -66,6 +79,7 @@
             <tr><td><code>{{"{{"}}TELEPHONE{{"}}"}}</code></td><td class="text-muted small">Téléphone</td></tr>
             <tr><td><code>{{"{{"}}LINKEDIN{{"}}"}}</code></td><td class="text-muted small">URL LinkedIn</td></tr>
             <tr><td><code>{{"{{"}}BIO{{"}}"}}</code></td><td class="text-muted small">Texte de présentation</td></tr>
+            <tr><td><code>{{"{{"}}TRIGRAMME{{"}}"}}</code></td><td class="text-muted small">Ex : YLO (1re lettre prénom + 2 premières du nom)</td></tr>
           </tbody>
         </table>
       </div>
