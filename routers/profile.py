@@ -68,7 +68,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
     # Sérialiser pour la timeline JS (vis-timeline)
     def _exp_to_dict(exp):
         return {
-            "id":          exp.id,
+            "id":          str(exp.id),
             "titre_poste": exp.titre_poste,
             "entreprise":  exp.entreprise or "",
             "date_debut":  exp.date_debut.strftime("%Y-%m-%d"),
