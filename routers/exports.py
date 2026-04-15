@@ -62,6 +62,7 @@ def generate_export(
     template_id: str  = Form(...),
     language_id: str  = Form(...),
     format: str       = Form(...),
+    nom: str          = Form(default=""),
     db: Session       = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
@@ -98,14 +99,18 @@ def generate_export(
         final_path = str(docx_path)
 
     from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    # Nom par défaut : <nom template> <JJ/MM/AAAA HH:MM>
+    export_nom = nom.strip() or f"{template.nom} {now.strftime('%d/%m/%Y %H:%M')}"
     export = CVExport(
         id=export_id,
         user_id=current_user.id,
         template_id=tmpl_uuid,
         language_id=lang_uuid,
         format=export_fmt,
+        nom=export_nom,
         fichier_path=final_path,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=now,
     )
     db.add(export)
     db.commit()
@@ -121,3 +126,17 @@ def download_export(export_id: str, db: Session = Depends(get_db), current_user:
 
     filename = f"CV_{current_user.nom}_{current_user.prenom}.{export.format.value}"
     return FileResponse(export.fichier_path, filename=filename)
+
+
+@router.post("/{export_id}/delete")
+def delete_export(export_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    export = db.query(CVExport).filter(
+        CVExport.id == uuid.UUID(export_id),
+        CVExport.user_id == current_user.id,
+    ).first()
+    if export:
+        if export.fichier_path:
+            Path(export.fichier_path).unlink(missing_ok=True)
+        db.delete(export)
+        db.commit()
+    return RedirectResponse(url="/exports/", status_code=303)

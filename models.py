@@ -373,6 +373,7 @@ class CVExport(AuditMixin, Base):
     template_id  = Column(Uuid, ForeignKey("template.id"),  nullable=False)
     language_id  = Column(Uuid, ForeignKey("language.id"),  nullable=False)
     format       = Column(Enum(ExportFormatEnum), nullable=False)
+    nom          = Column(String(200), nullable=True)        # Nom personnalisé de l'export
     fichier_path = Column(String(500), nullable=True)   # NULL tant que la génération n'est pas terminée
     generated_at = Column(DateTime(timezone=True), nullable=True)
 
