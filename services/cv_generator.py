@@ -319,6 +319,40 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
     ])
 
     doc.save(output_path)
+    _strip_mip_label(output_path)
+
+
+def _strip_mip_label(docx_path: str) -> None:
+    """
+    Supprime les métadonnées d'étiquette de sensibilité Microsoft (MIP/AIP)
+    du fichier .docx généré. Sans ça, Word refuse d'ouvrir les fichiers
+    issus de templates classifiés Sopra Steria (ex: C2 — Usage restreint).
+    """
+    import zipfile, shutil, os, tempfile
+
+    tmp = docx_path + ".tmp"
+    with zipfile.ZipFile(docx_path, "r") as zin, \
+         zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            # Supprimer les fichiers MIP et les propriétés custom (classification)
+            if item.filename in ("docMetadata/LabelInfo.xml", "docProps/custom.xml"):
+                continue
+            data = zin.read(item.filename)
+            # Nettoyer la référence à custom.xml dans [Content_Types].xml
+            if item.filename == "[Content_Types].xml":
+                data = data.replace(
+                    b'<Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/>',
+                    b""
+                )
+            # Nettoyer la référence à custom.xml dans les relations
+            if item.filename == "_rels/.rels":
+                import re as _re
+                data = _re.sub(
+                    rb'<Relationship[^/]*/docProps/custom\.xml[^/]*/>', b"", data
+                )
+            zout.writestr(item, data)
+
+    os.replace(tmp, docx_path)
 
 
 def convert_docx_to_pdf(docx_path: str, pdf_path: str) -> None:
