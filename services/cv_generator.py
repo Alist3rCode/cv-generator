@@ -55,14 +55,190 @@ Système de balises dans le template Word :
 
 import copy
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
 from docx import Document
 from docx.oxml.ns import qn
+from lxml import etree
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
+
+
+# ── Convertisseur HTML → blocs Word ────────────────────────────────────────
+
+class _QuillParser(HTMLParser):
+    """
+    Parse le HTML généré par Quill et produit une liste de blocs :
+    chaque bloc = liste de runs { text, bold, italic, underline }.
+    Les <p> et <li> deviennent des blocs séparés.
+    """
+    def __init__(self):
+        super().__init__()
+        self.blocks: list[list[dict]] = []   # liste de paragraphes
+        self._runs: list[dict] = []          # runs du paragraphe courant
+        self._bold = self._italic = self._underline = False
+        self._list_type: str | None = None   # 'ul' | 'ol'
+        self._ol_idx = 0
+        self._prefix = ""
+
+    def _push_block(self):
+        if self._runs or self._prefix:
+            self.blocks.append({"prefix": self._prefix, "runs": self._runs})
+        self._runs = []
+        self._prefix = ""
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "p":
+            self._runs = []
+            self._prefix = ""
+        elif tag == "ul":
+            self._list_type = "ul"
+        elif tag == "ol":
+            self._list_type = "ol"
+            self._ol_idx = 0
+        elif tag == "li":
+            self._runs = []
+            if self._list_type == "ol":
+                self._ol_idx += 1
+                self._prefix = f"{self._ol_idx}. "
+            else:
+                self._prefix = "• "
+        elif tag in ("strong", "b"):
+            self._bold = True
+        elif tag in ("em", "i"):
+            self._italic = True
+        elif tag == "u":
+            self._underline = True
+        elif tag == "br":
+            self._runs.append({"text": "\n", "bold": False, "italic": False, "underline": False})
+
+    def handle_endtag(self, tag):
+        if tag in ("p", "li"):
+            self._push_block()
+        elif tag in ("strong", "b"):
+            self._bold = False
+        elif tag in ("em", "i"):
+            self._italic = False
+        elif tag == "u":
+            self._underline = False
+        elif tag in ("ul", "ol"):
+            self._list_type = None
+
+    def handle_data(self, data):
+        if data:
+            self._runs.append({
+                "text": data,
+                "bold": self._bold,
+                "italic": self._italic,
+                "underline": self._underline,
+            })
+
+    def handle_entityref(self, name):
+        entities = {"amp": "&", "lt": "<", "gt": ">", "nbsp": " ", "quot": '"'}
+        self.handle_data(entities.get(name, ""))
+
+    def handle_charref(self, name):
+        try:
+            char = chr(int(name[1:], 16) if name.startswith("x") else int(name))
+            self.handle_data(char)
+        except ValueError:
+            pass
+
+
+def _parse_html_blocks(html: str) -> list[dict]:
+    """Retourne la liste de blocs issus du HTML Quill."""
+    if not html or html.strip() in ("", "<p><br></p>"):
+        return []
+    parser = _QuillParser()
+    parser.feed(html)
+    # Filtrer les blocs vides (paragraphes <p><br></p>)
+    return [b for b in parser.blocks if any(r["text"].strip() for r in b["runs"]) or b["prefix"]]
+
+
+def _make_run_xml(rpr_el, text: str, bold: bool, italic: bool, underline: bool):
+    """Crée un élément <w:r> avec les propriétés de formatage données."""
+    r = etree.SubElement(etree.Element("dummy"), qn("w:r"))
+    # Copier les propriétés du run d'origine (police, taille, couleur…)
+    if rpr_el is not None:
+        r.append(copy.deepcopy(rpr_el))
+    rpr = r.find(qn("w:rPr"))
+    if rpr is None:
+        rpr = etree.SubElement(r, qn("w:rPr"))
+        r.insert(0, rpr)
+    # Appliquer bold / italic / underline par-dessus
+    for tag, active in [(qn("w:b"), bold), (qn("w:i"), italic), (qn("w:u"), underline)]:
+        existing = rpr.find(tag)
+        if active and existing is None:
+            el = etree.SubElement(rpr, tag)
+            if tag == qn("w:u"):
+                el.set(qn("w:val"), "single")
+        elif not active and existing is not None:
+            rpr.remove(existing)
+    t = etree.SubElement(r, qn("w:t"))
+    t.text = text
+    if text.startswith(" ") or text.endswith(" "):
+        t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    return r
+
+
+def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
+    """
+    Trouve le paragraphe contenant `marker` dans la cellule,
+    le remplace par des paragraphes Word construits à partir du HTML Quill.
+    Si le HTML est vide, efface juste le marqueur.
+    """
+    for para in list(cell.paragraphs):
+        full_text = "".join(r.text for r in para.runs)
+        if marker not in full_text:
+            continue
+
+        blocks = _parse_html_blocks(html or "")
+        p_el = para._p
+        parent = p_el.getparent()
+        insert_idx = list(parent).index(p_el)
+
+        if not blocks:
+            # Effacer le marqueur, garder le paragraphe vide
+            if para.runs:
+                para.runs[0].text = ""
+                for r in para.runs[1:]:
+                    r.text = ""
+            return
+
+        # Récupérer les propriétés du paragraphe et du 1er run pour les cloner
+        ppr_el = p_el.find(qn("w:pPr"))
+        first_run = p_el.find(qn("w:r"))
+        rpr_el = first_run.find(qn("w:rPr")) if first_run is not None else None
+
+        # Créer un nouveau <w:p> par bloc HTML
+        new_els = []
+        for block in blocks:
+            new_p = etree.Element(qn("w:p"))
+            if ppr_el is not None:
+                new_p.append(copy.deepcopy(ppr_el))
+            # Préfixe (bullet ou numéro)
+            if block["prefix"]:
+                r_el = _make_run_xml(rpr_el, block["prefix"], bold=False, italic=False, underline=False)
+                new_p.append(r_el)
+            for run in block["runs"]:
+                r_el = _make_run_xml(rpr_el, run["text"], run["bold"], run["italic"], run["underline"])
+                new_p.append(r_el)
+            new_els.append(new_p)
+
+        # Insérer les nouveaux paragraphes et supprimer le placeholder
+        for i, new_p in enumerate(new_els):
+            parent.insert(insert_idx + i, new_p)
+        parent.remove(p_el)
+        return
+
+    # Récursion sur les tableaux imbriqués
+    for tbl in cell.tables:
+        for row in tbl.rows:
+            for c in row.cells:
+                _replace_html_field_in_cell(c, marker, html)
 
 def _fmt_date(d) -> str:
     """Formate une date Python en 'MM/YYYY', ou '' si None."""
@@ -160,10 +336,20 @@ def _fill_row(row, replacements: dict[str, str]) -> None:
         _replace_in_cell(cell, replacements)
 
 
-def _expand_table_section(doc: Document, marker: str, items: list[dict[str, str]]) -> None:
+def _expand_table_section(
+    doc: Document,
+    marker: str,
+    items: list[dict[str, str]],
+    html_fields: dict[str, str] | None = None,
+) -> None:
     """
     Trouve la table contenant `marker`, clone la ligne modèle pour chaque item
     et supprime la ligne modèle originale.
+
+    html_fields : dict marker → clé dans chaque item dont la valeur est du HTML
+                  (ex : {"{{EXP_DESC}}": "{{EXP_DESC}}"}).
+                  Ces champs sont exclus du remplacement textuel simple et traités
+                  via _replace_html_field_in_cell pour préserver le formatage Word.
 
     Important : on calcule la position d'insertion parmi TOUS les enfants XML
     du <w:tbl> (pas seulement les <w:tr>), car le tbl contient aussi w:tblPr,
@@ -171,6 +357,8 @@ def _expand_table_section(doc: Document, marker: str, items: list[dict[str, str]
     insertions et corromprait le fichier.
     """
     from docx.table import _Row
+
+    html_fields = html_fields or {}
 
     for table in doc.tables:
         template_row = _find_template_row(table, marker)
@@ -194,7 +382,16 @@ def _expand_table_section(doc: Document, marker: str, items: list[dict[str, str]
             new_tr = _clone_row(template_row)
             tbl.insert(insert_pos + i, new_tr)
             new_row = _Row(new_tr, table)
-            _fill_row(new_row, item)
+
+            # Remplacement textuel simple (sans les champs HTML)
+            simple_item = {k: v for k, v in item.items() if k not in html_fields}
+            _fill_row(new_row, simple_item)
+
+            # Remplacement HTML → paragraphes Word
+            for marker_key, item_key in html_fields.items():
+                html_val = item.get(item_key, "") or ""
+                for cell in new_row.cells:
+                    _replace_html_field_in_cell(cell, marker_key, html_val)
 
         # Supprimer la ligne modèle (maintenant décalée de len(items) positions)
         tbl.remove(tr_el)
@@ -283,7 +480,10 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
             "{{EXP_SOFT_TITRE}}":  "Environnement Fonctionnel : " if soft_noms else "",
             "{{EXP_SOFT_NOM}}":    " , ".join(soft_noms),
         })
-    _expand_table_section(doc, "{{EXP_TITRE}}", exp_rows)
+    _expand_table_section(
+        doc, "{{EXP_TITRE}}", exp_rows,
+        html_fields={"{{EXP_DESC}}": "{{EXP_DESC}}"},
+    )
 
     # Formations
     _expand_table_section(doc, "{{FORM_DIPLOME}}", [
