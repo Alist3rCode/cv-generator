@@ -54,10 +54,12 @@ def list_templates(request: Request, db: Session = Depends(get_db), current_user
 @router.get("/upload", response_class=HTMLResponse)
 def upload_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     admin_orgs = _get_user_orgs_as_admin(current_user, db)
+    from datetime import date
     return templates_jinja.TemplateResponse("admin/template_upload.html", {
         "request": request,
         "current_user": current_user,
         "admin_orgs": admin_orgs,
+        "now": date.today(),
     })
 
 
