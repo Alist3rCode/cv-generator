@@ -158,17 +158,27 @@ def _parse_html_blocks(html: str) -> list[dict]:
     return [b for b in parser.blocks if any(r["text"].strip() for r in b["runs"]) or b["prefix"]]
 
 
-def _make_run_xml(rpr_el, text: str, bold: bool, italic: bool, underline: bool):
-    """Crée un élément <w:r> avec les propriétés de formatage données."""
-    r = etree.SubElement(etree.Element("dummy"), qn("w:r"))
-    # Copier les propriétés du run d'origine (police, taille, couleur…)
-    if rpr_el is not None:
-        r.append(copy.deepcopy(rpr_el))
+def _make_run_xml(template_run_el, text: str, bold: bool, italic: bool, underline: bool):
+    """
+    Crée un <w:r> en clonant `template_run_el` (préserve police, taille, couleur…),
+    puis remplace le texte et applique les surcharges bold/italic/underline.
+    Si template_run_el est None, crée un run minimal.
+    """
+    if template_run_el is not None:
+        r = copy.deepcopy(template_run_el)
+    else:
+        r = etree.Element(qn("w:r"))
+
+    # Supprimer les anciens w:t et w:br
+    for child in list(r):
+        if child.tag in (qn("w:t"), qn("w:br")):
+            r.remove(child)
+
+    # Ajuster bold / italic / underline
     rpr = r.find(qn("w:rPr"))
     if rpr is None:
-        rpr = etree.SubElement(r, qn("w:rPr"))
+        rpr = etree.Element(qn("w:rPr"))
         r.insert(0, rpr)
-    # Appliquer bold / italic / underline par-dessus
     for tag, active in [(qn("w:b"), bold), (qn("w:i"), italic), (qn("w:u"), underline)]:
         existing = rpr.find(tag)
         if active and existing is None:
@@ -177,27 +187,33 @@ def _make_run_xml(rpr_el, text: str, bold: bool, italic: bool, underline: bool):
                 el.set(qn("w:val"), "single")
         elif not active and existing is not None:
             rpr.remove(existing)
+
     t = etree.SubElement(r, qn("w:t"))
     t.text = text
-    if text.startswith(" ") or text.endswith(" "):
+    if text and (text.startswith(" ") or text.endswith(" ")):
         t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
     return r
 
 
-def _build_text_paragraphs(text: str, ppr_el, rpr_el) -> list:
+def _clone_paragraph(p_el) -> "etree._Element":
+    """Clone un <w:p> en supprimant tous ses runs — conserve pPr et toute la mise en forme."""
+    new_p = copy.deepcopy(p_el)
+    for r in new_p.findall(qn("w:r")):
+        new_p.remove(r)
+    return new_p
+
+
+def _build_text_paragraphs(text: str, p_el, template_run_el) -> list:
     """
-    Convertit un texte brut (pouvant contenir des \n) en liste de <w:p>.
-    Chaque \n crée un nouveau paragraphe (pas un <w:br/>).
-    Les segments vides sont conservés comme paragraphes vides.
+    Convertit un texte brut (pouvant contenir des \\n) en liste de <w:p>.
+    Chaque segment séparé par \\n devient un paragraphe distinct.
+    La mise en forme est héritée du paragraphe et du run template.
     """
     new_els = []
     for segment in text.split("\n"):
-        new_p = etree.Element(qn("w:p"))
-        if ppr_el is not None:
-            new_p.append(copy.deepcopy(ppr_el))
+        new_p = _clone_paragraph(p_el)
         if segment:
-            r_el = _make_run_xml(rpr_el, segment, bold=False, italic=False, underline=False)
-            new_p.append(r_el)
+            new_p.append(_make_run_xml(template_run_el, segment, False, False, False))
         new_els.append(new_p)
     return new_els
 
@@ -209,7 +225,8 @@ def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
 
     Si d'autres balises (déjà remplacées) sont présentes dans le même paragraphe
     avant ou après le marker, leur texte est préservé dans des paragraphes séparés
-    autour du contenu HTML.
+    autour du contenu HTML. La mise en forme (police, couleur, taille) est héritée
+    du paragraphe template via clonage du <w:p> et du premier <w:r>.
     """
     for para in list(cell.paragraphs):
         full_text = "".join(r.text for r in para.runs)
@@ -222,38 +239,32 @@ def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
         parent = p_el.getparent()
         insert_idx = list(parent).index(p_el)
 
-        ppr_el = p_el.find(qn("w:pPr"))
-        first_run = p_el.find(qn("w:r"))
-        rpr_el = first_run.find(qn("w:rPr")) if first_run is not None else None
+        # Run template : sert de base pour cloner la mise en forme
+        template_run_el = p_el.find(qn("w:r"))
 
         new_els = []
 
-        # Texte avant le marker (ex: vide en général)
+        # Texte avant le marker
         if before:
-            new_els += _build_text_paragraphs(before, ppr_el, rpr_el)
+            new_els += _build_text_paragraphs(before, p_el, template_run_el)
 
         # Contenu HTML converti en paragraphes Word
         if blocks:
             for block in blocks:
-                new_p = etree.Element(qn("w:p"))
-                if ppr_el is not None:
-                    new_p.append(copy.deepcopy(ppr_el))
+                new_p = _clone_paragraph(p_el)
                 if block["prefix"]:
-                    new_p.append(_make_run_xml(rpr_el, block["prefix"], False, False, False))
+                    new_p.append(_make_run_xml(template_run_el, block["prefix"], False, False, False))
                 for run in block["runs"]:
-                    new_p.append(_make_run_xml(rpr_el, run["text"], run["bold"], run["italic"], run["underline"]))
+                    new_p.append(_make_run_xml(template_run_el, run["text"], run["bold"], run["italic"], run["underline"]))
                 new_els.append(new_p)
 
         # Texte après le marker (ex: "\nEnvironnement Technique : Python, Java")
         if after:
-            new_els += _build_text_paragraphs(after, ppr_el, rpr_el)
+            new_els += _build_text_paragraphs(after, p_el, template_run_el)
 
-        # Si rien du tout, insérer un paragraphe vide pour ne pas laisser de trou
+        # Paragraphe vide si rien à insérer (description vide + pas de before/after)
         if not new_els:
-            new_p = etree.Element(qn("w:p"))
-            if ppr_el is not None:
-                new_p.append(copy.deepcopy(ppr_el))
-            new_els.append(new_p)
+            new_els.append(_clone_paragraph(p_el))
 
         for i, new_p in enumerate(new_els):
             parent.insert(insert_idx + i, new_p)
