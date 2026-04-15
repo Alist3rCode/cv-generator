@@ -160,11 +160,11 @@
     </a>
 
     <!-- Toggle thème -->
-    <div class="sidebar-link sidebar-theme-row">
+    <div class="sidebar-link sidebar-theme-row" style="cursor:pointer;" onclick="document.getElementById('themeToggle').click()">
       <i class="bi bi-moon-stars sidebar-icon" id="themeIcon"></i>
       <span class="sidebar-label">
         <span id="themeLabel">Thème sombre</span>
-        <div class="form-check form-switch mb-0 ms-auto">
+        <div class="form-check form-switch mb-0 ms-auto" onclick="event.stopPropagation()">
           <input class="form-check-input" type="checkbox" id="themeToggle" role="switch" />
         </div>
       </span>
