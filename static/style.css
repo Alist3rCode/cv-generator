@@ -308,6 +308,39 @@ body.has-sidebar {
   white-space: nowrap;
 }
 
+/* ── vis-timeline ── */
+.vis-timeline-wrap {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--bs-border-color, #e5e7eb);
+}
+/* Masquer les labels de l'axe majeur (mois) */
+.vis-timeline-wrap .vis-label { display: none; }
+/* Fond adaptatif */
+.vis-timeline-wrap .vis-timeline,
+.vis-timeline-wrap .vis-panel.vis-center,
+.vis-timeline-wrap .vis-panel.vis-bottom {
+  background: var(--bs-body-bg);
+  border-color: var(--bs-border-color, #e5e7eb);
+}
+.vis-timeline-wrap .vis-text.vis-minor {
+  color: var(--bs-secondary-color);
+  font-size: .7rem;
+}
+.vis-timeline-wrap .vis-grid.vis-minor,
+.vis-timeline-wrap .vis-grid.vis-major {
+  border-color: var(--bs-border-color, #e5e7eb);
+}
+/* Items : pas de box-shadow parasite */
+.vis-timeline-wrap .vis-item {
+  font-size: .75rem;
+  font-weight: 600;
+  border-width: 1px;
+  padding: 2px 6px;
+}
+.vis-timeline-wrap .vis-item.vis-selected { border-width: 2px; }
+
 /* ── Nuage de mots flottant ── */
 .word-cloud-container {
   display: flex;

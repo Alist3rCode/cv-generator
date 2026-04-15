@@ -40,67 +40,9 @@
       </div>
     </div>
 
-    <!-- Ligne 2 : timeline des expériences -->
+    <!-- Ligne 2 : timeline vis-timeline -->
     {% if experiences_asc %}
-    {# Calcul des bornes globales en Jinja #}
-    {% set ns = namespace(min_year=9999, max_year=0) %}
-    {% for exp in experiences_asc %}
-      {% set y1 = exp.date_debut.year %}
-      {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
-      {% if y1 < ns.min_year %}{% set ns.min_year = y1 %}{% endif %}
-      {% if y2 > ns.max_year %}{% set ns.max_year = y2 %}{% endif %}
-    {% endfor %}
-    {% set total_span = (ns.max_year - ns.min_year) if ns.max_year > ns.min_year else 1 %}
-    {% set palette = ['#6366f1','#818cf8','#a5b4fc'] %}
-
-    <div class="dash-timeline-wrap">
-      {# Barre de fond avec segments #}
-      <div class="tl-bar-bg">
-        {% for exp in experiences_asc %}
-          {% set y1 = exp.date_debut.year %}
-          {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
-          {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
-          {% set width_pct = ((y2 - y1) / total_span * 100) | round(3) %}
-          {% set color = palette[loop.index0 % 3] %}
-          <div class="tl-segment"
-               style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;background:{{ color }};"
-               title="{{ exp.entreprise }} ({{ exp.date_debut.year }}–{{ exp.date_fin.year if exp.date_fin else 'présent' }})">
-          </div>
-        {% endfor %}
-      </div>
-
-      {# Labels entreprises sous la barre #}
-      <div class="tl-labels">
-        {% for exp in experiences_asc %}
-          {% set y1 = exp.date_debut.year %}
-          {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
-          {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
-          {% set width_pct = ((y2 - y1) / total_span * 100) | round(3) %}
-          <div class="tl-label"
-               style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;">
-            {{ exp.entreprise }}
-          </div>
-        {% endfor %}
-      </div>
-
-      {# Années repères #}
-      <div class="tl-years" id="tlYears">
-        {% for exp in experiences_asc %}
-          {% set y1 = exp.date_debut.year %}
-          {% set left_pct = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
-          <span class="tl-year" style="left:{{ left_pct }}%;" data-year="{{ y1 }}">{{ y1 }}</span>
-        {% endfor %}
-        {% if experiences_asc[-1].date_fin %}
-          {% set last_y = experiences_asc[-1].date_fin.year %}
-        {% else %}
-          {% set last_y = now_year %}
-        {% endif %}
-        {% if last_y != experiences_asc[-1].date_debut.year %}
-        <span class="tl-year tl-year--end" data-year="{{ last_y }}">{{ last_y }}</span>
-        {% endif %}
-      </div>
-
-    </div>
+    <div id="visTimeline" class="vis-timeline-wrap"></div>
     {% endif %}
 
   </div>
@@ -245,6 +187,8 @@
 </div>
 {% endif %}
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vis-timeline@7.7.3/styles/vis-timeline-graph2d.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/vis-timeline@7.7.3/standalone/umd/vis-timeline-graph2d.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
   const completion = {{ completion }};
@@ -279,21 +223,76 @@
     donutChart.update('none');
   };
 
-  // ── Timeline : masquer les années trop proches ──
+  // ── vis-timeline ──────────────────────────────────────────────────────
   (function() {
-    var container = document.getElementById('tlYears');
+    var container = document.getElementById('visTimeline');
     if (!container) return;
-    var endEl = container.querySelector('.tl-year--end');
-    if (endEl) { endEl.style.left = '100%'; endEl.style.transform = 'translateX(-100%)'; }
-    requestAnimationFrame(function() {
-      var spans = Array.from(container.querySelectorAll('.tl-year'));
-      var lastRight = -Infinity;
-      spans.forEach(function(el) {
-        var rect = el.getBoundingClientRect();
-        if (rect.left < lastRight + 28) { el.style.visibility = 'hidden'; }
-        else { el.style.visibility = 'visible'; lastRight = rect.right; }
-      });
-    });
+
+    var raw = {{ experiences_asc | tojson }};
+    if (!raw || !raw.length) return;
+
+    // Palette : indigo / soft yellows alternée
+    var palettes = [
+      { bg: '#6366f1', border: '#4f46e5', text: '#fff' },           // indigo
+      { bg: '#fde68a', border: '#f59e0b', text: '#78350f' },        // jaune miel
+      { bg: '#818cf8', border: '#6366f1', text: '#fff' },           // indigo clair
+      { bg: '#fcd34d', border: '#d97706', text: '#78350f' },        // ambre
+    ];
+
+    var today = new Date().toISOString().slice(0, 10);
+
+    var items = new vis.DataSet(raw.map(function(exp, i) {
+      var p = palettes[i % palettes.length];
+      return {
+        id: exp.id,
+        content: exp.entreprise || exp.titre_poste,
+        start: exp.date_debut,
+        end:   exp.date_fin || today,
+        style: 'background-color:' + p.bg + ';border-color:' + p.border + ';color:' + p.text + ';border-radius:5px;',
+        type: 'range',
+      };
+    }));
+
+    var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+
+    var options = {
+      stack: false,
+      moveable: false,
+      zoomable: false,
+      selectable: false,
+      orientation: { axis: 'bottom' },
+      height: '80px',
+      margin: { item: { horizontal: 2, vertical: 4 } },
+      timeAxis: { scale: 'year', step: 1 },
+      format: { minorLabels: { year: 'YYYY' }, majorLabels: {} },
+      showMajorLabels: false,
+      showMinorLabels: true,
+      showCurrentTime: false,
+      tooltip: { followMouse: true },
+    };
+
+    var tl = new vis.Timeline(container, items, options);
+
+    // Adapter les couleurs de la grille au thème
+    function applyTimelineTheme(dark) {
+      var bg   = dark ? '#1e1b4b' : '#ffffff';
+      var text = dark ? '#c7d2fe' : '#6b7280';
+      var border = dark ? '#312e81' : '#e5e7eb';
+      container.style.setProperty('--vis-background', bg);
+      container.querySelectorAll('.vis-text').forEach(function(el) { el.style.color = text; });
+      container.querySelectorAll('.vis-grid.vis-minor, .vis-grid.vis-major').forEach(function(el) { el.style.borderColor = border; });
+    }
+
+    tl.on('changed', function() { applyTimelineTheme(document.documentElement.getAttribute('data-bs-theme') === 'dark'); });
+
+    // Réagir au changement de thème
+    var prev = window.__onThemeChange;
+    window.__onThemeChange = function(theme) {
+      if (prev) prev(theme);
+      applyTimelineTheme(theme === 'dark');
+      // Forcer redraw
+      tl.redraw();
+    };
   })();
 
   // ── Nuage de mots flottant (HTML + CSS animations) ─────────────────

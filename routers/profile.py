@@ -65,6 +65,17 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
 
     exps_dedup = _dedup(all_exps)  # triées ASC pour la timeline
 
+    # Sérialiser pour la timeline JS (vis-timeline)
+    def _exp_to_dict(exp):
+        return {
+            "id":          exp.id,
+            "titre_poste": exp.titre_poste,
+            "entreprise":  exp.entreprise or "",
+            "date_debut":  exp.date_debut.strftime("%Y-%m-%d"),
+            "date_fin":    exp.date_fin.strftime("%Y-%m-%d") if exp.date_fin else None,
+        }
+    exps_asc_json = [_exp_to_dict(e) for e in exps_dedup]
+
     # ── Nuage de mots : poids = niveau * nb_occurrences_dans_expériences ──
     # Compter les occurrences de chaque GID dans toutes les expériences
     from collections import Counter as _Counter
@@ -102,7 +113,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
         "criteria":       criteria,
         "bio":            bio,
         "experiences":    list(reversed(exps_dedup)),   # DESC pour la liste résumé
-        "experiences_asc": exps_dedup,                  # ASC pour la timeline
+        "experiences_asc": exps_asc_json,               # ASC pour la timeline (dicts JSON)
         "formations":     _dedup(all_forms),
         "certifications": _dedup(all_certs),
         "hard_count":     hard_count,
