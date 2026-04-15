@@ -13,8 +13,11 @@ Application web de génération de CV, développée avec **FastAPI** et **SQLite
 - **Import de template Word** — L'admin importe un `.docx` avec des balises `{{BALISE}}`
 - **Export CV** — Génération en `.docx` ou `.pdf` à partir du template
 - **Multi-langue** — 5 langues par défaut (FR 🇫🇷, EN 🇬🇧, ES 🇪🇸, IT 🇮🇹, DE 🇩🇪), drapeaux interactifs sur tous les formulaires
-- **Dashboard** — Donut de complétion, résumé complet du CV (bio, certifs, formations, expériences)
-- **Thème clair / sombre** — Détecte automatiquement la préférence système, toggle dans la navbar
+- **Dashboard** — Indicateurs (expériences, formations, certifications, hard/soft skills), timeline interactive des expériences, donut de complétion, nuage de compétences animé
+- **Sidebar** — Navigation latérale repliable (icônes seules ou avec labels), état mémorisé dans `localStorage`
+- **Timeline vis-timeline** — Barres colorées (indigo/jaune), labels externes pour les expériences courtes, années significatives uniquement sur l'axe
+- **Nuage de compétences** — Mots flottants animés, taille proportionnelle au poids (niveau × occurrences dans les expériences), hard skills en orange sanguine, soft skills en vert
+- **Thème clair / sombre** — Détecte automatiquement la préférence système, toggle dans la sidebar
 - **Rôles** — Utilisateur standard / Administrateur par organisation
 
 ## Stack technique
@@ -29,6 +32,7 @@ Application web de génération de CV, développée avec **FastAPI** et **SQLite
 | Templates HTML | Jinja2 + Bootstrap 5.3 |
 | Éditeur riche | [Quill.js](https://quilljs.com/) (CDN) |
 | Graphique | [Chart.js](https://www.chartjs.org/) (CDN) |
+| Timeline | [vis-timeline](https://visjs.github.io/vis-timeline/) (CDN) |
 | Drapeaux | [flagcdn.com](https://flagcdn.com) (SVG) |
 | Autocomplete | [Nominatim / OpenStreetMap](https://nominatim.org/) |
 | Génération DOCX | `python-docx` |
@@ -96,8 +100,12 @@ cv-generator/
 ├── services/
 │   └── cv_generator.py      # Moteur de génération DOCX/PDF
 │
+├── static/
+│   ├── style.css            # Styles globaux (sidebar, timeline, nuage de mots…)
+│   └── favicon.png
+│
 ├── templates/
-│   ├── base.html            # Layout principal (navbar, dark mode)
+│   ├── base.html            # Layout principal (sidebar repliable, dark mode, autocomplete)
 │   ├── macros.html          # Macros Jinja2 (lang_tabs, unsaved_guard)
 │   ├── auth/
 │   ├── profile/             # dashboard.html, edit.html
@@ -106,9 +114,6 @@ cv-generator/
 │   ├── certifications/
 │   ├── competences/
 │   └── exports/
-│
-├── static/
-│   └── style.css
 │
 ├── uploads/                 # Templates Word importés (ignoré par git)
 └── exports/                 # CV générés (ignoré par git)
@@ -131,7 +136,11 @@ La **bio** est par utilisateur × langue (pas de GID).
 | Bouton Enregistrer | Passe en bleu (`btn-primary`) si le formulaire a des modifications non sauvegardées |
 | Alerte quitter | Pop-up navigateur si vous tentez de quitter une page avec des modifications non sauvegardées |
 | Page vide | Expériences / formations / certifications / compétences vides redirigent directement vers le formulaire d'ajout |
-| Thème | Détecte la préférence système (clair/sombre), modifiable via le menu utilisateur, mémorisé dans `localStorage` |
+| Thème | Détecte la préférence système (clair/sombre), modifiable via la sidebar, mémorisé dans `localStorage` |
+| Sidebar | Repliable (icônes seules), état persisté dans `localStorage` |
+| Autocomplete localisation | Suggestions Nominatim avec navigation clavier (↑ ↓ Entrée Échap) sur tous les champs de localisation |
+| Picker compétences | Ajout/retrait de compétences depuis le formulaire d'expérience, avec création inline |
+| Suppression compétence | Modale de confirmation listant les expériences impactées avant suppression |
 
 ## Utilisation des templates Word
 
