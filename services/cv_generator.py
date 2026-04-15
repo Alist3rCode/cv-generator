@@ -289,8 +289,27 @@ def _replace_in_paragraph(para, replacements: dict[str, str]) -> None:
     for key, value in replacements.items():
         new_text = new_text.replace(key, value or "")
 
-    # Mettre le texte final dans le premier run, vider les autres
-    para.runs[0].text = new_text
+    # Mettre le texte final dans le premier run, vider les autres.
+    # Si new_text contient des \n, on les convertit en <w:br/> dans le XML du run.
+    first_run = para.runs[0]
+    if "\n" in new_text:
+        r_el = first_run._r
+        # Supprimer le <w:t> existant et tout <w:br> résiduel
+        for child in list(r_el):
+            if child.tag in (qn("w:t"), qn("w:br")):
+                r_el.remove(child)
+        # Reconstruire avec des <w:br/> aux bons endroits
+        parts = new_text.split("\n")
+        for idx, part in enumerate(parts):
+            if idx > 0:
+                br = etree.SubElement(r_el, qn("w:br"))
+            if part:
+                t = etree.SubElement(r_el, qn("w:t"))
+                t.text = part
+                if part.startswith(" ") or part.endswith(" "):
+                    t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    else:
+        first_run.text = new_text
     for run in para.runs[1:]:
         run.text = ""
 
@@ -475,9 +494,9 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
             "{{EXP_SUMMARY}}":     e.project_summary or "",
             "{{EXP_DESC}}":        e.description or "",
             "{{EXP_DUREE}}":       _fmt_duration(e.date_debut, e.date_fin),
-            "{{EXP_HARD_TITRE}}":  "Environnement Technique : " if hard_noms else "",
+            "{{EXP_HARD_TITRE}}":  "\nEnvironnement Technique : " if hard_noms else "",
             "{{EXP_HARD_NOM}}":    " , ".join(hard_noms),
-            "{{EXP_SOFT_TITRE}}":  "Environnement Fonctionnel : " if soft_noms else "",
+            "{{EXP_SOFT_TITRE}}":  "\nEnvironnement Fonctionnel : " if soft_noms else "",
             "{{EXP_SOFT_NOM}}":    " , ".join(soft_noms),
         })
     _expand_table_section(
