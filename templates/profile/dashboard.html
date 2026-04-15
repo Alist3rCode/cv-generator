@@ -241,10 +241,19 @@
 
     var today = new Date().toISOString().slice(0, 10);
 
-    // Seuil : expérience < 60 jours → label externe (box) + barre fantôme (range)
+    // Seuil : expérience < 60 jours → label externe (box dans groupe "labels")
+    //         sinon → label dans la barre (range dans groupe "bars")
     var SHORT_DAYS = 60;
 
+    // Deux groupes : "bars" (ligne du bas) et "labels" (ligne du haut pour les courtes)
+    var groups = new vis.DataSet([
+      { id: 'labels', content: '', order: 0 },
+      { id: 'bars',   content: '', order: 1 },
+    ]);
+
     var dataItems = [];
+    var hasShort  = false;
+
     raw.forEach(function(exp, i) {
       var p       = palettes[i % palettes.length];
       var label   = exp.entreprise || exp.titre_poste;
@@ -253,43 +262,45 @@
       var durDays = (endMs - startMs) / 86400000;
       var midDate = new Date((startMs + endMs) / 2).toISOString().slice(0, 10);
 
-      var rangeStyle = 'background-color:' + p.bg + ';border-color:' + p.border
-                     + ';color:' + p.text + ';border-radius:5px;';
-      var boxStyle   = 'background-color:' + p.bg + ';border-color:' + p.border
-                     + ';color:' + p.text + ';border-radius:4px;';
-      var tooltip    = label + '<br><small>' + exp.date_debut.slice(0,7)
-                     + ' → ' + (exp.date_fin ? exp.date_fin.slice(0,7) : 'présent') + '</small>';
+      var baseStyle = 'background-color:' + p.bg + ';border-color:' + p.border
+                    + ';color:' + p.text + ';border-radius:5px;';
+      var tooltip   = label + '<br><small>' + exp.date_debut.slice(0, 7)
+                    + ' → ' + (exp.date_fin ? exp.date_fin.slice(0, 7) : 'présent') + '</small>';
 
       if (durDays >= SHORT_DAYS) {
-        // Expérience longue : label dans la barre
+        // Expérience longue : label dans la barre, groupe "bars"
         dataItems.push({
-          id: exp.id,
+          id:      exp.id,
+          group:   'bars',
           content: label,
-          title: tooltip,
-          start: exp.date_debut,
-          end:   exp.date_fin || today,
-          style: rangeStyle,
-          type: 'range',
+          title:   tooltip,
+          start:   exp.date_debut,
+          end:     exp.date_fin || today,
+          style:   baseStyle,
+          type:    'range',
         });
       } else {
-        // Expérience courte : barre vide + bulle pointée au milieu
+        hasShort = true;
+        // Barre fine dans le groupe "bars" (durée réelle, sans label)
         dataItems.push({
-          id: exp.id + '_bar',
+          id:      exp.id + '_bar',
+          group:   'bars',
           content: '',
-          title: tooltip,
-          start: exp.date_debut,
-          end:   exp.date_fin || today,
-          style: rangeStyle + 'min-width:4px;',
-          type: 'range',
-          editable: false,
+          title:   tooltip,
+          start:   exp.date_debut,
+          end:     exp.date_fin || today,
+          style:   baseStyle + 'min-width:4px;',
+          type:    'range',
         });
+        // Bulle dans le groupe "labels" au milieu de la période, avec ligne de pointage
         dataItems.push({
-          id: exp.id + '_box',
+          id:      exp.id + '_box',
+          group:   'labels',
           content: label,
-          title: tooltip,
-          start: midDate,
-          style: boxStyle,
-          type: 'box',
+          title:   tooltip,
+          start:   midDate,
+          style:   baseStyle + 'border-radius:4px;',
+          type:    'box',
         });
       }
     });
@@ -297,12 +308,13 @@
     var items = new vis.DataSet(dataItems);
 
     var options = {
-      stack: false,
-      moveable: false,
-      zoomable: false,
+      stack:     false,
+      moveable:  false,
+      zoomable:  false,
       selectable: false,
       orientation: { axis: 'bottom' },
-      height: '110px',
+      // Hauteur adaptée : si des exp courtes existent, on a 2 lignes
+      height: hasShort ? '150px' : '90px',
       margin: { item: { horizontal: 2, vertical: 4 } },
       timeAxis: { scale: 'year', step: 1 },
       format: { minorLabels: { year: 'YYYY' }, majorLabels: {} },
@@ -310,9 +322,10 @@
       showMinorLabels: true,
       showCurrentTime: false,
       tooltip: { followMouse: true, delay: 100 },
+      groupOrder: 'order',
     };
 
-    var tl = new vis.Timeline(container, items, options);
+    var tl = new vis.Timeline(container, items, groups, options);
 
     // Adapter les couleurs de la grille au thème
     function applyTimelineTheme(dark) {

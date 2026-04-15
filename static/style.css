@@ -351,6 +351,9 @@ body.has-sidebar {
 .vis-timeline-wrap .vis-item.vis-box .vis-item-overflow { overflow: visible; }
 /* Ligne de pointage (dot-line) hérite de la couleur du label */
 .vis-timeline-wrap .vis-item.vis-line { border-width: 1px; }
+/* Masquer la colonne des noms de groupes (on n'en a pas besoin) */
+.vis-timeline-wrap .vis-labelset { display: none; }
+.vis-timeline-wrap .vis-panel.vis-left { display: none; }
 
 /* ── Nuage de mots flottant ── */
 .word-cloud-container {
