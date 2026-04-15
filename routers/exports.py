@@ -78,9 +78,9 @@ def generate_export(
         "user":           current_user,
         "profile":        db.query(Profile).filter(Profile.user_id == current_user.id).first(),
         "bio":            db.query(Bio).filter(Bio.user_id == current_user.id, Bio.language_id == lang_uuid).first(),
-        "experiences":    db.query(Experience).filter(Experience.user_id == current_user.id, Experience.language_id == lang_uuid).order_by(Experience.date_debut.desc()).all(),
-        "formations":     db.query(Formation).filter(Formation.user_id == current_user.id, Formation.language_id == lang_uuid).order_by(Formation.date_debut.desc()).all(),
-        "certifications": db.query(Certification).filter(Certification.user_id == current_user.id, Certification.language_id == lang_uuid).order_by(Certification.date_obtention.desc()).all(),
+        "experiences":    db.query(Experience).filter(Experience.user_id == current_user.id, Experience.language_id == lang_uuid, Experience.deleted_at == None).order_by(Experience.date_debut.desc()).all(),
+        "formations":     db.query(Formation).filter(Formation.user_id == current_user.id, Formation.language_id == lang_uuid, Formation.deleted_at == None).order_by(Formation.date_debut.desc()).all(),
+        "certifications": db.query(Certification).filter(Certification.user_id == current_user.id, Certification.language_id == lang_uuid, Certification.deleted_at == None).order_by(Certification.date_obtention.desc()).all(),
         "competences":     db.query(Competence).filter(Competence.user_id == current_user.id, Competence.language_id == lang_uuid).all(),
         "profil_langues":  db.query(ProfilLangue).filter(ProfilLangue.user_id == current_user.id).order_by(ProfilLangue.created_at).all(),
     }
@@ -89,7 +89,14 @@ def generate_export(
     export_fmt = ExportFormatEnum(format)
 
     docx_path = EXPORT_DIR / f"{export_id}.docx"
-    generate_cv_docx(template.fichier_path, profile_data, str(docx_path))
+    try:
+        generate_cv_docx(template.fichier_path, profile_data, str(docx_path))
+    except Exception:
+        import traceback
+        tb = traceback.format_exc()
+        if request.headers.get("X-Requested-With") == "fetch":
+            return JSONResponse({"error": tb}, status_code=500)
+        return JSONResponse({"error": tb}, status_code=500)
 
     if export_fmt == ExportFormatEnum.pdf:
         pdf_path = EXPORT_DIR / f"{export_id}.pdf"
