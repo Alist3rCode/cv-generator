@@ -218,70 +218,109 @@ def _build_text_paragraphs(text: str, p_el, template_run_el) -> list:
     return new_els
 
 
-def _get_para_full_text(p_el) -> str:
-    """
-    Extrait le texte complet d'un <w:p> en parcourant le XML directement.
-    Nécessaire car après _replace_in_paragraph, un <w:r> peut contenir
-    plusieurs <w:t> et des <w:br/>, invisibles via para.runs[i].text.
-    Les <w:br/> sont représentés par \\n.
-    """
-    parts = []
-    for r in p_el.findall(qn("w:r")):
-        for child in r:
-            if child.tag == qn("w:t"):
-                parts.append(child.text or "")
-            elif child.tag == qn("w:br"):
-                parts.append("\n")
-    return "".join(parts)
+def _run_text(r_el) -> str:
+    """Texte complet d'un <w:r> (tous ses <w:t>)."""
+    return "".join(t.text or "" for t in r_el.findall(qn("w:t")))
 
 
 def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
     """
-    Trouve le paragraphe contenant `marker` dans la cellule et le remplace
-    par des paragraphes Word construits à partir du HTML Quill.
+    Traite le paragraphe contenant `marker` AVANT _fill_row, pendant que les
+    runs ont encore leur formatage d'origine (police, couleur, taille…).
 
-    Si d'autres balises (déjà remplacées) sont présentes dans le même paragraphe
-    avant ou après le marker, leur texte est préservé dans des paragraphes séparés
-    autour du contenu HTML. La mise en forme (police, couleur, taille) est héritée
-    du paragraphe template via clonage du <w:p> et du premier <w:r>.
+    Algorithme :
+    1. Reconstituer le texte complet du paragraphe run par run.
+    2. Identifier par position de caractère quels runs sont avant, pendant
+       ou après le marker (un run peut chevaucher le marker).
+    3. Créer :
+       - un paragraphe avec les runs « avant » (copiés tels quels)
+       - des paragraphes pour le contenu HTML (formatage du run qui porte le marker)
+       - un paragraphe avec les runs « après » (copiés tels quels, ils contiennent
+         encore {{EXP_SOFT_TITRE}} etc. que _fill_row traitera ensuite)
     """
     for para in list(cell.paragraphs):
-        full_text = _get_para_full_text(para._p)
+        p_el = para._p
+        all_runs = p_el.findall(qn("w:r"))
+        full_text = "".join(_run_text(r) for r in all_runs)
+
         if marker not in full_text:
             continue
 
-        before, after = full_text.split(marker, 1)
-        blocks = _parse_html_blocks(html or "")
-        p_el = para._p
-        parent = p_el.getparent()
-        insert_idx = list(parent).index(p_el)
+        marker_start = full_text.index(marker)
+        marker_end   = marker_start + len(marker)
 
-        # Run template : sert de base pour cloner la mise en forme
-        template_run_el = p_el.find(qn("w:r"))
+        ppr_el       = p_el.find(qn("w:pPr"))
+        parent       = p_el.getparent()
+        insert_idx   = list(parent).index(p_el)
+
+        before_runs: list = []
+        after_runs:  list = []
+        desc_run_el        = None   # run portant le marker (pour son formatage)
+
+        pos = 0
+        for r in all_runs:
+            r_text = _run_text(r)
+            r_end  = pos + len(r_text)
+
+            if r_end <= marker_start:
+                # Entièrement avant le marker
+                before_runs.append(copy.deepcopy(r))
+
+            elif pos >= marker_end:
+                # Entièrement après le marker
+                after_runs.append(copy.deepcopy(r))
+
+            else:
+                # Ce run chevauche le marker — on note son formatage
+                if desc_run_el is None:
+                    desc_run_el = r
+
+                # Texte de ce run qui précède le marker
+                pre = full_text[max(pos, 0): marker_start]
+                if pos < marker_start and pre:
+                    before_runs.append(_make_run_xml(r, pre, False, False, False))
+
+                # Texte de ce run qui suit le marker
+                suf = full_text[marker_end: r_end]
+                if r_end > marker_end and suf:
+                    after_runs.insert(
+                        len([x for x in after_runs]),  # append au début des after
+                        _make_run_xml(r, suf, False, False, False)
+                    )
+
+            pos = r_end
+
+        blocks = _parse_html_blocks(html or "")
+
+        def _make_p_with_runs(runs):
+            new_p = etree.Element(qn("w:p"))
+            if ppr_el is not None:
+                new_p.append(copy.deepcopy(ppr_el))
+            for r in runs:
+                new_p.append(r)
+            return new_p
 
         new_els = []
 
-        # Texte avant le marker
-        if before:
-            new_els += _build_text_paragraphs(before, p_el, template_run_el)
+        if before_runs:
+            new_els.append(_make_p_with_runs(before_runs))
 
-        # Contenu HTML converti en paragraphes Word
         if blocks:
             for block in blocks:
-                new_p = _clone_paragraph(p_el)
+                new_p = etree.Element(qn("w:p"))
+                if ppr_el is not None:
+                    new_p.append(copy.deepcopy(ppr_el))
                 if block["prefix"]:
-                    new_p.append(_make_run_xml(template_run_el, block["prefix"], False, False, False))
+                    new_p.append(_make_run_xml(desc_run_el, block["prefix"], False, False, False))
                 for run in block["runs"]:
-                    new_p.append(_make_run_xml(template_run_el, run["text"], run["bold"], run["italic"], run["underline"]))
+                    new_p.append(_make_run_xml(desc_run_el, run["text"], run["bold"], run["italic"], run["underline"]))
                 new_els.append(new_p)
 
-        # Texte après le marker (ex: "\nEnvironnement Technique : Python, Java")
-        if after:
-            new_els += _build_text_paragraphs(after, p_el, template_run_el)
+        if after_runs:
+            new_els.append(_make_p_with_runs(after_runs))
 
-        # Paragraphe vide si rien à insérer (description vide + pas de before/after)
         if not new_els:
-            new_els.append(_clone_paragraph(p_el))
+            new_els.append(etree.Element(qn("w:p")))
 
         for i, new_p in enumerate(new_els):
             parent.insert(insert_idx + i, new_p)
@@ -456,15 +495,15 @@ def _expand_table_section(
             tbl.insert(insert_pos + i, new_tr)
             new_row = _Row(new_tr, table)
 
-            # Remplacement textuel simple (sans les champs HTML)
-            simple_item = {k: v for k, v in item.items() if k not in html_fields}
-            _fill_row(new_row, simple_item)
-
-            # Remplacement HTML → paragraphes Word
+            # 1. Remplacement HTML en premier — runs encore intacts, formatage préservé
             for marker_key, item_key in html_fields.items():
                 html_val = item.get(item_key, "") or ""
                 for cell in new_row.cells:
                     _replace_html_field_in_cell(cell, marker_key, html_val)
+
+            # 2. Remplacement textuel simple sur le reste (hors champs HTML)
+            simple_item = {k: v for k, v in item.items() if k not in html_fields}
+            _fill_row(new_row, simple_item)
 
         # Supprimer la ligne modèle (maintenant décalée de len(items) positions)
         tbl.remove(tr_el)
