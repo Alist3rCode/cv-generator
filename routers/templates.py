@@ -81,12 +81,7 @@ async def upload_template(
             status_code=400,
         )
 
-    # Désactiver les anciens templates actifs de l'organisation
     org_id = uuid.UUID(organisation_id)
-    db.query(Template).filter(
-        Template.organisation_id == org_id,
-        Template.is_active == True,
-    ).update({"is_active": False})
 
     # Sauvegarder le fichier
     file_id   = uuid.uuid4()
