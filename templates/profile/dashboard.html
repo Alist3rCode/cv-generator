@@ -311,6 +311,13 @@
 
     var items = new vis.DataSet(dataItems);
 
+    // Années significatives : début et fin de chaque expérience
+    var significantYears = new Set();
+    raw.forEach(function(exp) {
+      significantYears.add(new Date(exp.date_debut).getFullYear());
+      significantYears.add(new Date(exp.date_fin || today).getFullYear());
+    });
+
     var options = {
       stack:     true,
       moveable:  false,
@@ -320,7 +327,13 @@
       height: null,  // auto : s'adapte au nombre de lignes stackées
       margin: { item: { horizontal: 2, vertical: 4 } },
       timeAxis: { scale: 'year', step: 1 },
-      format: { minorLabels: { year: 'YYYY' }, majorLabels: {} },
+      format: {
+        minorLabels: function(date, scale) {
+          if (scale !== 'year') return '';
+          return significantYears.has(date.getFullYear()) ? String(date.getFullYear()) : '';
+        },
+        majorLabels: function() { return ''; },
+      },
       showMajorLabels: false,
       showMinorLabels: true,
       showCurrentTime: false,
