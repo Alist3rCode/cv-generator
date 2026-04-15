@@ -18,9 +18,9 @@ env/
 *.db
 *.sqlite3
 
-# Fichiers uploadés et exports générés
+# Fichiers uploadés et exports générés (dossier racine uniquement)
 uploads/
-exports/
+/exports/
 
 # IDE
 .vscode/

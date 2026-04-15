@@ -101,7 +101,7 @@ def generate_export(
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     # Nom par défaut : <nom template> <JJ/MM/AAAA HH:MM>
-    export_nom = nom.strip() or f"{template.nom} {now.strftime('%d/%m/%Y %H:%M')}"
+    export_nom = nom.strip() or f"{template.nom} - {now.strftime('%d/%m/%Y %H:%M')}"
     export = CVExport(
         id=export_id,
         user_id=current_user.id,

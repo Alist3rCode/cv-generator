@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Exporter mon CV — CV Generator{% endblock %}
+
+{% block content %}
+<h3 class="mb-4"><i class="bi bi-file-earmark-arrow-down"></i> Exporter mon CV</h3>
+
+{% if not active_templates %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle"></i>
+  Aucun template actif n'est disponible pour votre organisation.
+  Contactez un administrateur pour en importer un.
+</div>
+{% else %}
+
+<div class="card shadow-sm mb-5">
+  <div class="card-body">
+    <form method="post" action="/exports/generate">
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Template <span class="text-danger">*</span></label>
+          <select name="template_id" class="form-select" required id="templateSelect">
+            {% for t in active_templates %}
+            <option value="{{ t.id }}" data-nom="{{ t.nom }}">{{ t.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Langue <span class="text-danger">*</span></label>
+          <select name="language_id" class="form-select" required>
+            {% for lang in languages %}
+            <option value="{{ lang.id }}">{{ lang.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Format <span class="text-danger">*</span></label>
+          <select name="format" class="form-select" required>
+            <option value="docx">Word (.docx)</option>
+            <option value="pdf">PDF (.pdf)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Nom du fichier <span class="text-muted small fw-normal">(facultatif)</span></label>
+        <input type="text" name="nom" id="nomExport" class="form-control" />
+        <div class="form-text text-muted" id="nomPlaceholderHint"></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-download"></i> Générer et télécharger
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if previous_exports %}
+<h5 class="mb-3">Exports récents</h5>
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Date</th>
+          <th>Format</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in previous_exports %}
+        <tr>
+          <td class="fw-semibold">{{ e.nom or '—' }}</td>
+          <td class="text-muted small">{{ e.generated_at.strftime('%d/%m/%Y %H:%M') if e.generated_at else '—' }}</td>
+          <td><span class="badge bg-secondary">{{ e.format.value.upper() }}</span></td>
+          <td>
+            <div class="d-flex gap-2">
+              {% if e.fichier_path %}
+              <a href="/exports/{{ e.id }}/download" class="btn btn-sm btn-outline-primary" title="Télécharger">
+                <i class="bi bi-download"></i>
+              </a>
+              {% else %}
+              <span class="text-muted small">En cours…</span>
+              {% endif %}
+              <form method="post" action="/exports/{{ e.id }}/delete"
+                    onsubmit="return confirm('Supprimer cet export ?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<script>
+(function() {
+  var templateSelect = document.getElementById('templateSelect');
+  var nomInput       = document.getElementById('nomExport');
+  var hint           = document.getElementById('nomPlaceholderHint');
+  if (!templateSelect || !nomInput) return;
+
+  function updateHint() {
+    var opt  = templateSelect.options[templateSelect.selectedIndex];
+    var nom  = opt ? opt.dataset.nom : '';
+    var now  = new Date();
+    var dd   = String(now.getDate()).padStart(2, '0');
+    var mm   = String(now.getMonth() + 1).padStart(2, '0');
+    var yyyy = now.getFullYear();
+    var hh   = String(now.getHours()).padStart(2, '0');
+    var min  = String(now.getMinutes()).padStart(2, '0');
+    var defaultNom = nom + ' - ' + dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
+    nomInput.placeholder = defaultNom;
+    if (hint) hint.textContent = 'Nom par défaut : ' + defaultNom;
+  }
+
+  templateSelect.addEventListener('change', updateHint);
+  updateHint();
+})();
+</script>
+{% endblock %}
