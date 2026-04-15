@@ -249,10 +249,11 @@
   var selectedGids = new Set(); // GIDs sélectionnés (clic simple)
 
   function levelDots(niveau, type) {
-    var color = type === 'hard' ? 'primary' : 'success';
+    // hard : orange sanguine, soft : vert
+    var style = type === 'hard' ? 'color:#e05c1a' : 'color:#22c55e';
     var dots = '';
     for (var i = 1; i <= 4; i++) {
-      dots += '<i class="bi bi-circle' + (i <= niveau ? '-fill' : '') + ' text-' + color + ' small"></i>';
+      dots += '<i class="bi bi-circle' + (i <= niveau ? '-fill' : '') + ' small" style="' + style + '"></i>';
     }
     return dots;
   }
@@ -270,7 +271,9 @@
     if (side === 'assigned') {
       chip.classList.add('bg-primary', 'text-white', 'border-primary');
     } else {
-      chip.classList.add('bg-light', 'text-dark', 'border-secondary');
+      chip.classList.add('border-secondary');
+      chip.style.background = 'var(--bs-secondary-bg)';
+      chip.style.color      = 'var(--bs-body-color)';
     }
 
     chip.addEventListener('click', function(e) {
