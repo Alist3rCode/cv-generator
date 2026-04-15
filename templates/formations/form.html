@@ -94,48 +94,12 @@
   inputs.forEach(function(el) { el.addEventListener('input', checkChanges); });
 
   // Autocomplete ville via Nominatim
-  var villeInput = document.getElementById('villeInput');
-  var villeList  = document.getElementById('villeSuggestions');
-  if (villeInput && villeList) {
-    var timer = null;
-    villeInput.addEventListener('input', function() {
-      clearTimeout(timer);
-      var q = villeInput.value.trim();
-      if (q.length < 2) { villeList.style.display = 'none'; return; }
-      timer = setTimeout(function() {
-        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=' + encodeURIComponent(q), {
-          headers: { 'Accept-Language': 'fr' }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(results) {
-          villeList.innerHTML = '';
-          var seen = new Set();
-          results.forEach(function(r) {
-            var city    = r.address.city || r.address.town || r.address.village || r.address.county || r.display_name.split(',')[0];
-            var country = r.address.country || '';
-            var label   = city.trim() + (country ? ', ' + country : '');
-            if (seen.has(label)) return;
-            seen.add(label);
-            var li = document.createElement('li');
-            li.className = 'list-group-item list-group-item-action py-1 small';
-            li.style.cursor = 'pointer';
-            li.textContent  = label;
-            li.addEventListener('mousedown', function(e) {
-              e.preventDefault();
-              villeInput.value = label;
-              villeList.style.display = 'none';
-              checkChanges();
-            });
-            villeList.appendChild(li);
-          });
-          villeList.style.display = villeList.children.length ? 'block' : 'none';
-        })
-        .catch(function() { villeList.style.display = 'none'; });
-      }, 400);
-    });
-    document.addEventListener('click', function(e) {
-      if (!villeList.contains(e.target) && e.target !== villeInput) villeList.style.display = 'none';
-    });
+  if (document.getElementById('villeInput')) {
+    initLocationAutocomplete(
+      document.getElementById('villeInput'),
+      document.getElementById('villeSuggestions'),
+      checkChanges
+    );
   }
 })();
 </script>
