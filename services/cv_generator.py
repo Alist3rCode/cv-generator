@@ -495,9 +495,9 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
             "{{EXP_DESC}}":        e.description or "",
             "{{EXP_DUREE}}":       _fmt_duration(e.date_debut, e.date_fin),
             "{{EXP_HARD_TITRE}}":  "\nEnvironnement Technique : " if hard_noms else "",
-            "{{EXP_HARD_NOM}}":    " , ".join(hard_noms),
+            "{{EXP_HARD_NOM}}":    " , ".join(n.strip() for n in hard_noms),
             "{{EXP_SOFT_TITRE}}":  "\nEnvironnement Fonctionnel : " if soft_noms else "",
-            "{{EXP_SOFT_NOM}}":    " , ".join(soft_noms),
+            "{{EXP_SOFT_NOM}}":    " , ".join(n.strip() for n in soft_noms),
         })
     _expand_table_section(
         doc, "{{EXP_TITRE}}", exp_rows,
