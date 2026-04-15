@@ -41,7 +41,7 @@
     </div>
 
     <!-- Ligne 2 : timeline des expériences -->
-    {% if experiences_asc %}
+    {% if experiences_asc and experiences_asc | length > 0 %}
     {# Calcul des bornes globales en Jinja #}
     {% set ns = namespace(min_year=9999, max_year=0) %}
     {% for exp in experiences_asc %}
@@ -62,44 +62,30 @@
           {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
           {% set width_pct = ((y2 - y1) / total_span * 100) | round(3) %}
           {% set color = palette[loop.index0 % 3] %}
+          {# Arrondi uniquement sur les extrémités absolues de la barre #}
+          {% if loop.first and loop.last %}{% set radius = '6px' %}
+          {% elif loop.first %}{% set radius = '6px 0 0 6px' %}
+          {% elif loop.last %}{% set radius = '0 6px 6px 0' %}
+          {% else %}{% set radius = '0' %}{% endif %}
           <div class="tl-segment"
-               style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;background:{{ color }};"
+               style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;background:{{ color }};border-radius:{{ radius }};"
                title="{{ exp.entreprise }} ({{ exp.date_debut.year }}–{{ exp.date_fin.year if exp.date_fin else 'présent' }})">
           </div>
         {% endfor %}
       </div>
 
-      {# Labels entreprises — un par segment, positionné sous la barre #}
+      {# Labels entreprises — année + nom sur 2 lignes, débordement accepté #}
       <div class="tl-labels">
         {% for exp in experiences_asc %}
           {% set y1 = exp.date_debut.year %}
           {% set y2 = exp.date_fin.year if exp.date_fin else now_year %}
           {% set left_pct  = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
           {% set width_pct = ((y2 - y1) / total_span * 100) | round(3) %}
-          <div class="tl-label"
-               style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;">
-            {{ exp.entreprise }}
+          <div class="tl-label" style="left:{{ left_pct }}%;width:{{ [width_pct, 1.5] | max }}%;">
+            <span class="tl-label-year">{{ y1 }}{% if y2 != y1 %}–{{ y2 }}{% endif %}</span>
+            <span class="tl-label-name">{{ exp.entreprise }}</span>
           </div>
         {% endfor %}
-      </div>
-
-      {# Années : début de chaque segment + dernière année à droite.
-         Le JS masquera celles qui se chevauchent. #}
-      <div class="tl-years" id="tlYears">
-        {% for exp in experiences_asc %}
-          {% set y1 = exp.date_debut.year %}
-          {% set left_pct = ((y1 - ns.min_year) / total_span * 100) | round(3) %}
-          <span class="tl-year" style="left:{{ left_pct }}%;" data-year="{{ y1 }}">{{ y1 }}</span>
-        {% endfor %}
-        {# Dernière année uniquement si différente du dernier début #}
-        {% if experiences_asc[-1].date_fin %}
-          {% set last_y = experiences_asc[-1].date_fin.year %}
-        {% else %}
-          {% set last_y = now_year %}
-        {% endif %}
-        {% if last_y != experiences_asc[-1].date_debut.year %}
-        <span class="tl-year tl-year--end" data-year="{{ last_y }}">{{ last_y }}</span>
-        {% endif %}
       </div>
 
     </div>
@@ -289,7 +275,7 @@
     var words = {{ cloud_words | tojson }};
     if (!words.length) return;
 
-    var hardColors = ['#4f46e5','#6366f1','#818cf8','#a5b4fc'];
+    var hardColors = ['#c2440f','#e05c1a','#f07030','#ea8040'];  /* orange sanguine */
     var softColors = ['#16a34a','#22c55e','#4ade80'];
 
     // Taille de police : size normalisée 1-10 → 11px à 38px
@@ -336,34 +322,5 @@
     });
   })();
 
-  // ── Timeline : masquer les années trop proches ──
-  (function() {
-    var container = document.getElementById('tlYears');
-    if (!container) return;
-
-    // Positionner la dernière année (end) à droite
-    var endEl = container.querySelector('.tl-year--end');
-    if (endEl) {
-      endEl.style.left  = '100%';
-      endEl.style.transform = 'translateX(-100%)';
-    }
-
-    // Attendre que le layout soit calculé
-    requestAnimationFrame(function() {
-      var spans = Array.from(container.querySelectorAll('.tl-year'));
-      var minGap = 28; // px minimum entre deux labels
-      var lastRight = -Infinity;
-
-      spans.forEach(function(el) {
-        var rect = el.getBoundingClientRect();
-        if (rect.left < lastRight + minGap) {
-          el.style.visibility = 'hidden';
-        } else {
-          el.style.visibility = 'visible';
-          lastRight = rect.right;
-        }
-      });
-    });
-  })();
 </script>
 {% endblock %}
