@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -114,6 +114,16 @@ def generate_export(
     )
     db.add(export)
     db.commit()
+
+    # Si appelé via fetch (JS), retourner JSON pour mise à jour sans rechargement
+    if request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({
+            "export_id":    str(export_id),
+            "nom":          export_nom,
+            "format":       export_fmt.value,
+            "generated_at": now.strftime("%d/%m/%Y %H:%M"),
+            "download_url": f"/exports/{export_id}/download",
+        })
 
     return RedirectResponse(url=f"/exports/{export_id}/download", status_code=303)
 

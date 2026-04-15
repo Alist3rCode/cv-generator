@@ -47,7 +47,7 @@
         <input type="text" name="nom" id="nomExport" class="form-control" />
       </div>
 
-      <button type="submit" class="btn btn-primary">
+      <button type="submit" class="btn btn-primary" id="generateBtn">
         <i class="bi bi-download"></i> Générer et télécharger
       </button>
     </form>
@@ -56,10 +56,10 @@
 {% endif %}
 
 {% if previous_exports %}
-<h5 class="mb-3">Exports récents</h5>
-<div class="card shadow-sm">
+<h5 class="mb-3 mt-5">Exports récents</h5>
+<div class="card shadow-sm" id="exportsHistoryCard">
   <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table table-hover align-middle mb-0" id="exportsHistory">
       <thead>
         <tr>
           <th>Nom</th>
@@ -68,7 +68,7 @@
           <th>Actions</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="exportsHistoryBody">
         {% for e in previous_exports %}
         <tr>
           <td class="fw-semibold">{{ e.nom or '—' }}</td>
@@ -134,6 +134,106 @@
 </div>
 
 <script>
+// ── Soumission du formulaire de génération via fetch ───────────────────────
+(function() {
+  var form = document.querySelector('form[action="/exports/generate"]');
+  var btn  = document.getElementById('generateBtn');
+  if (!form) return;
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // État chargement
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération en cours…';
+
+    fetch('/exports/generate', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'fetch' },
+      body: new FormData(form),
+    })
+    .then(function(r) {
+      if (!r.ok) throw new Error('Erreur serveur');
+      return r.json();
+    })
+    .then(function(data) {
+      // Déclencher le téléchargement via un lien temporaire
+      var a = document.createElement('a');
+      a.href = data.download_url;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Injecter la nouvelle ligne dans l'historique
+      _prependExportRow(data);
+    })
+    .catch(function() {
+      alert('Une erreur est survenue lors de la génération.');
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-download"></i> Générer et télécharger';
+    });
+  });
+
+  function _prependExportRow(data) {
+    // Créer le tableau s'il n'existe pas encore
+    var section = document.getElementById('exportsHistory');
+    if (!section) {
+      // Construire la section entière
+      var wrapper = document.createElement('div');
+      wrapper.innerHTML = [
+        '<h5 class="mb-3 mt-5">Exports récents</h5>',
+        '<div class="card shadow-sm" id="exportsHistoryCard">',
+        '  <div class="table-responsive">',
+        '    <table class="table table-hover align-middle mb-0" id="exportsHistory">',
+        '      <thead><tr><th>Nom</th><th>Date</th><th>Format</th><th>Actions</th></tr></thead>',
+        '      <tbody id="exportsHistoryBody"></tbody>',
+        '    </table>',
+        '  </div>',
+        '</div>',
+      ].join('');
+      // Insérer après le formulaire card
+      var formCard = document.querySelector('.card.shadow-sm.mb-5');
+      if (formCard && formCard.parentNode) {
+        formCard.parentNode.insertBefore(wrapper, formCard.nextSibling);
+      } else {
+        document.querySelector('.main-inner, main').appendChild(wrapper);
+      }
+    }
+
+    var tbody = document.getElementById('exportsHistoryBody');
+    if (!tbody) return;
+
+    var badge = data.format === 'pdf'
+      ? '<span class="badge bg-danger">PDF</span>'
+      : '<span class="badge bg-secondary">DOCX</span>';
+
+    var safeName = data.nom.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+
+    var tr = document.createElement('tr');
+    tr.innerHTML = [
+      '<td class="fw-semibold">' + safeName + '</td>',
+      '<td class="text-muted small">' + data.generated_at + '</td>',
+      '<td>' + badge + '</td>',
+      '<td>',
+      '  <div class="d-flex gap-2">',
+      '    <a href="' + data.download_url + '" class="btn btn-sm btn-outline-primary" title="Télécharger">',
+      '      <i class="bi bi-download"></i>',
+      '    </a>',
+      '    <button type="button" class="btn btn-sm btn-outline-danger" title="Supprimer"',
+      '            onclick="confirmDeleteExport(\'' + data.export_id + '\', \'' + safeName.replace(/'/g, "\\'") + '\')">',
+      '      <i class="bi bi-trash"></i>',
+      '    </button>',
+      '  </div>',
+      '</td>',
+    ].join('');
+
+    tbody.insertBefore(tr, tbody.firstChild);
+  }
+})();
+
 var _deleteExportModal = null;
 
 function confirmDeleteExport(exportId, nom) {

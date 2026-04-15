@@ -71,6 +71,25 @@ def _fmt_date(d) -> str:
     return d.strftime("%m/%Y")
 
 
+def _fmt_duration(start, end=None) -> str:
+    """Calcule la durée entre deux dates en texte lisible (ex: '2 ans 3 mois')."""
+    from datetime import date
+    if start is None:
+        return ""
+    end = end or date.today()
+    total_months = (end.year - start.year) * 12 + (end.month - start.month)
+    if total_months < 1:
+        total_months = 1
+    years  = total_months // 12
+    months = total_months % 12
+    parts  = []
+    if years:
+        parts.append(f"{years} an{'s' if years > 1 else ''}")
+    if months:
+        parts.append(f"{months} mois")
+    return " ".join(parts) if parts else "< 1 mois"
+
+
 def _replace_in_paragraph(para, replacements: dict[str, str]) -> None:
     """
     Remplace les balises dans un paragraphe en gérant le split Word.
@@ -101,9 +120,13 @@ def _replace_in_paragraph(para, replacements: dict[str, str]) -> None:
 
 
 def _replace_in_doc(doc: Document, replacements: dict[str, str]) -> None:
-    """Remplace les balises dans tous les paragraphes du document (hors tableaux)."""
+    """Remplace les balises dans tous les paragraphes ET toutes les cellules de tableau."""
     for para in doc.paragraphs:
         _replace_in_paragraph(para, replacements)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                _replace_in_cell(cell, replacements)
 
 
 def _replace_in_cell(cell, replacements: dict[str, str]) -> None:
@@ -235,6 +258,7 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
             "{{EXP_FIN}}":         _fmt_date(e.date_fin) or "Présent",
             "{{EXP_SUMMARY}}":     e.project_summary or "",
             "{{EXP_DESC}}":        e.description or "",
+            "{{EXP_DUREE}}":       _fmt_duration(e.date_debut, e.date_fin),
             "{{EXP_HARD_TITRE}}":  "Environnement Technique : " if hard_noms else "",
             "{{EXP_HARD_NOM}}":    " , ".join(hard_noms),
             "{{EXP_SOFT_TITRE}}":  "Environnement Fonctionnel : " if soft_noms else "",
