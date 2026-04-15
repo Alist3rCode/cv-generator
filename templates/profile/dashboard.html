@@ -324,13 +324,14 @@
       zoomable:  false,
       selectable: false,
       orientation: { axis: 'bottom' },
-      height: null,  // auto : s'adapte au nombre de lignes stackées
+      minHeight: '80px',
       margin: { item: { horizontal: 2, vertical: 4 } },
       timeAxis: { scale: 'year', step: 1 },
       format: {
         minorLabels: function(date, scale) {
           if (scale !== 'year') return '';
-          return significantYears.has(date.getFullYear()) ? String(date.getFullYear()) : '';
+          var yr = date.year ? date.year() : date.getFullYear();
+          return significantYears.has(yr) ? String(yr) : '';
         },
         majorLabels: function() { return ''; },
       },
