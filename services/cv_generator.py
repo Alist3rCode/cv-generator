@@ -7,19 +7,24 @@ Système de balises dans le template Word :
   {{EMAIL}}            → Email
   {{TELEPHONE}}        → Téléphone
   {{LINKEDIN}}         → URL LinkedIn
+  {{POSTE}}            → Titre / poste professionnel
   {{BIO}}              → Texte de bio
 
   Pour les sections répétées, utiliser un tableau Word avec une ligne modèle
   contenant les balises suivantes :
 
   Expériences :
-    {{EXP_TITRE}}      → Titre du poste
-    {{EXP_ENTREPRISE}} → Entreprise
-    {{EXP_LOCATION}}   → Localisation
-    {{EXP_DEBUT}}      → Date de début
-    {{EXP_FIN}}        → Date de fin (ou "Présent")
-    {{EXP_SUMMARY}}    → Résumé de projet
-    {{EXP_DESC}}       → Description
+    {{EXP_TITRE}}       → Titre du poste
+    {{EXP_ENTREPRISE}}  → Entreprise
+    {{EXP_LOCATION}}    → Localisation
+    {{EXP_DEBUT}}       → Date de début
+    {{EXP_FIN}}         → Date de fin (ou "Présent")
+    {{EXP_SUMMARY}}     → Résumé de projet
+    {{EXP_DESC}}        → Description
+    {{EXP_HARD_TITRE}}  → "Environnement Technique : " si hard skills, sinon ""
+    {{EXP_HARD_NOM}}    → Hard skills liés, séparés par " , "
+    {{EXP_SOFT_TITRE}}  → "Environnement Fonctionnel : " si soft skills, sinon ""
+    {{EXP_SOFT_NOM}}    → Soft skills liés, séparés par " , "
 
   Formations :
     {{FORM_DIPLOME}}   → Diplôme
@@ -31,15 +36,21 @@ Système de balises dans le template Word :
     {{CERT_TITRE}}     → Titre
     {{CERT_ORG}}       → Organisme
     {{CERT_DATE}}      → Date d'obtention
-    {{CERT_FIN}}       → Date d'expiration (ou "")
+    {{CERT_FIN}}       → Date d'expiration (ou "pas d'expiration")
 
   Compétences hard :
     {{HARD_NOM}}       → Nom de la compétence
-    {{HARD_NIVEAU}}    → Niveau (1-4)
+    {{HARD_NIVEAU}}    → Libellé du niveau (ex : "Expert")
+    {{HARD_FAMILLE}}   → Famille de compétence
 
   Compétences soft :
     {{SOFT_NOM}}       → Nom de la compétence
-    {{SOFT_NIVEAU}}    → Niveau (1-4)
+    {{SOFT_NIVEAU}}    → Libellé du niveau (ex : "Intermédiaire")
+    {{SOFT_FAMILLE}}   → Famille de compétence
+
+  Langues parlées :
+    {{LNG_NOM}}        → Nom de la langue (ex : "Anglais")
+    {{LNG_NIVEAU}}     → Code + libellé CEFR (ex : "C1 — Autonome")
 """
 
 import copy
@@ -146,6 +157,16 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
     prof = profile.get("profile")
     bio  = profile.get("bio")
 
+    from models import SkillTypeEnum, CEFR_LABELS
+
+    # ── Libellés de niveau compétence ──
+    niveau_labels = {1: "Débutant", 2: "Intermédiaire", 3: "Avancé", 4: "Expert"}
+
+    # ── Index GID → Competence (toutes les compétences du user) ──
+    comp_by_gid: dict[str, Any] = {}
+    for c in profile.get("competences", []):
+        comp_by_gid[str(c.gid)] = c
+
     # ── Remplacements simples ──
     simple = {
         "{{NOM}}":       user.nom,
@@ -153,6 +174,7 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
         "{{EMAIL}}":     user.email,
         "{{TELEPHONE}}": (prof.telephone if prof else "") or "",
         "{{LINKEDIN}}":  (prof.linkedin_url if prof else "") or "",
+        "{{POSTE}}":     (prof.poste if prof else "") or "",
         "{{BIO}}":       (bio.texte if bio else "") or "",
     }
     _replace_in_doc(doc, simple)
@@ -166,18 +188,33 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
     # ── Sections répétées ──
 
     # Expériences
-    _expand_table_section(doc, "{{EXP_TITRE}}", [
-        {
-            "{{EXP_TITRE}}":      e.titre_poste,
-            "{{EXP_ENTREPRISE}}": e.entreprise,
-            "{{EXP_LOCATION}}":   e.location or "",
-            "{{EXP_DEBUT}}":      _fmt_date(e.date_debut),
-            "{{EXP_FIN}}":        _fmt_date(e.date_fin) or "Présent",
-            "{{EXP_SUMMARY}}":    e.project_summary or "",
-            "{{EXP_DESC}}":       e.description or "",
-        }
-        for e in profile.get("experiences", [])
-    ])
+    def _exp_skills(gids, skill_type):
+        """Retourne les noms des compétences d'un type donné pour une liste de GIDs."""
+        noms = []
+        for gid in (gids or []):
+            c = comp_by_gid.get(str(gid))
+            if c and c.type == skill_type:
+                noms.append(c.nom)
+        return noms
+
+    exp_rows = []
+    for e in profile.get("experiences", []):
+        hard_noms = _exp_skills(e.hard_skills, SkillTypeEnum.hard)
+        soft_noms = _exp_skills(e.soft_skills, SkillTypeEnum.soft)
+        exp_rows.append({
+            "{{EXP_TITRE}}":       e.titre_poste,
+            "{{EXP_ENTREPRISE}}":  e.entreprise,
+            "{{EXP_LOCATION}}":    e.location or "",
+            "{{EXP_DEBUT}}":       _fmt_date(e.date_debut),
+            "{{EXP_FIN}}":         _fmt_date(e.date_fin) or "Présent",
+            "{{EXP_SUMMARY}}":     e.project_summary or "",
+            "{{EXP_DESC}}":        e.description or "",
+            "{{EXP_HARD_TITRE}}":  "Environnement Technique : " if hard_noms else "",
+            "{{EXP_HARD_NOM}}":    " , ".join(hard_noms),
+            "{{EXP_SOFT_TITRE}}":  "Environnement Fonctionnel : " if soft_noms else "",
+            "{{EXP_SOFT_NOM}}":    " , ".join(soft_noms),
+        })
+    _expand_table_section(doc, "{{EXP_TITRE}}", exp_rows)
 
     # Formations
     _expand_table_section(doc, "{{FORM_DIPLOME}}", [
@@ -196,23 +233,39 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
             "{{CERT_TITRE}}": c.titre,
             "{{CERT_ORG}}":   c.organisme,
             "{{CERT_DATE}}":  _fmt_date(c.date_obtention),
-            "{{CERT_FIN}}":   _fmt_date(c.date_fin),
+            "{{CERT_FIN}}":   _fmt_date(c.date_fin) if c.date_fin else "pas d'expiration",
         }
         for c in profile.get("certifications", [])
     ])
 
-    # Compétences hard
-    from models import SkillTypeEnum
+    # Compétences
     hard = [c for c in profile.get("competences", []) if c.type == SkillTypeEnum.hard]
     soft = [c for c in profile.get("competences", []) if c.type == SkillTypeEnum.soft]
 
     _expand_table_section(doc, "{{HARD_NOM}}", [
-        {"{{HARD_NOM}}": c.nom, "{{HARD_NIVEAU}}": str(c.niveau.value)}
+        {
+            "{{HARD_NOM}}":    c.nom,
+            "{{HARD_NIVEAU}}": niveau_labels.get(c.niveau.value, str(c.niveau.value)),
+            "{{HARD_FAMILLE}}": c.famille or "",
+        }
         for c in hard
     ])
     _expand_table_section(doc, "{{SOFT_NOM}}", [
-        {"{{SOFT_NOM}}": c.nom, "{{SOFT_NIVEAU}}": str(c.niveau.value)}
+        {
+            "{{SOFT_NOM}}":    c.nom,
+            "{{SOFT_NIVEAU}}": niveau_labels.get(c.niveau.value, str(c.niveau.value)),
+            "{{SOFT_FAMILLE}}": c.famille or "",
+        }
         for c in soft
+    ])
+
+    # Langues parlées
+    _expand_table_section(doc, "{{LNG_NOM}}", [
+        {
+            "{{LNG_NOM}}":    l.nom,
+            "{{LNG_NIVEAU}}": CEFR_LABELS.get(l.niveau.value, l.niveau.value),
+        }
+        for l in profile.get("profil_langues", [])
     ])
 
     doc.save(output_path)

@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User, Profile, Language, Bio, Experience, Formation, Competence, Certification
+from models import User, Profile, Language, Bio, Experience, Formation, Competence, Certification, ProfilLangue, CEFRLevelEnum, CEFR_LABELS
 from routers.auth import require_user
 
 router = APIRouter(tags=["profile"])
@@ -154,6 +154,10 @@ def edit_profile_page(
         for b in db.query(Bio).filter(Bio.user_id == current_user.id).all()
     }
 
+    profil_langues = db.query(ProfilLangue).filter(
+        ProfilLangue.user_id == current_user.id
+    ).order_by(ProfilLangue.created_at).all()
+
     return templates.TemplateResponse("profile/edit.html", {
         "request":         request,
         "current_user":    current_user,
@@ -162,6 +166,8 @@ def edit_profile_page(
         "active_language": active_language,
         "bio":             bio,
         "bios_by_lang":    bios_by_lang,
+        "profil_langues":  profil_langues,
+        "cefr_levels":     [(e.value, CEFR_LABELS[e.value]) for e in CEFRLevelEnum],
     })
 
 
@@ -170,24 +176,50 @@ def edit_profile(
     request: Request,
     telephone: Optional[str]    = Form(None),
     linkedin_url: Optional[str] = Form(None),
+    poste: Optional[str]        = Form(None),
     bio_texte: Optional[str]    = Form(None),
     language_id: Optional[str]  = Form(None),
+    # Langues parlées : listes parallèles
+    langue_ids:     list[str]   = Form(default=[]),
+    langue_noms:    list[str]   = Form(default=[]),
+    langue_niveaux: list[str]   = Form(default=[]),
     db: Session                 = Depends(get_db),
     current_user: User          = Depends(require_user),
 ):
-    # Sauvegarder le profil (téléphone, LinkedIn)
+    # Sauvegarder le profil (téléphone, LinkedIn, poste)
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
     if profile:
         profile.telephone    = telephone or None
         profile.linkedin_url = linkedin_url or None
+        profile.poste        = poste or None
     else:
         profile = Profile(
             id=uuid.uuid4(),
             user_id=current_user.id,
             telephone=telephone or None,
             linkedin_url=linkedin_url or None,
+            poste=poste or None,
         )
         db.add(profile)
+
+    # ── Langues parlées ──────────────────────────────────────────────────────
+    # Supprimer toutes les langues existantes et recréer (formulaire liste complète)
+    db.query(ProfilLangue).filter(ProfilLangue.user_id == current_user.id).delete()
+    for nom, niveau_str in zip(langue_noms, langue_niveaux):
+        nom = nom.strip()
+        if not nom or not niveau_str:
+            continue
+        try:
+            niveau_enum = CEFRLevelEnum(niveau_str)
+        except ValueError:
+            continue
+        db.add(ProfilLangue(
+            id=uuid.uuid4(),
+            user_id=current_user.id,
+            nom=nom,
+            niveau=niveau_enum,
+        ))
+    # ────────────────────────────────────────────────────────────────────────
 
     # Sauvegarder la bio pour la langue active
     lang_id_str = (language_id or "").strip()

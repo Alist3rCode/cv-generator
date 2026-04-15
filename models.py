@@ -58,6 +58,24 @@ class ExportFormatEnum(PyEnum):
     pdf  = "pdf"
 
 
+class CEFRLevelEnum(PyEnum):
+    A1 = "A1"
+    A2 = "A2"
+    B1 = "B1"
+    B2 = "B2"
+    C1 = "C1"
+    C2 = "C2"
+
+CEFR_LABELS = {
+    "A1": "A1 — Débutant",
+    "A2": "A2 — Élémentaire",
+    "B1": "B1 — Intermédiaire",
+    "B2": "B2 — Intermédiaire avancé",
+    "C1": "C1 — Autonome",
+    "C2": "C2 — Maîtrise",
+}
+
+
 # ──────────────────────────────────────────────
 # Paramétrage
 # ──────────────────────────────────────────────
@@ -127,6 +145,8 @@ class User(AuditMixin, Base):
                                       foreign_keys="Competence.user_id")
     cv_exports         = relationship("CVExport",         back_populates="user",
                                       foreign_keys="CVExport.user_id")
+    profil_langues     = relationship("ProfilLangue",     back_populates="user",
+                                      foreign_keys="ProfilLangue.user_id")
 
 
 class UserOrganisation(AuditMixin, Base):
@@ -160,9 +180,27 @@ class Profile(AuditMixin, Base):
     photo_url    = Column(String(500), nullable=True)
     telephone    = Column(String(30),  nullable=True)
     linkedin_url = Column(String(500), nullable=True)
+    poste        = Column(String(200), nullable=True)
 
     # Relations
     user = relationship("User", back_populates="profile", foreign_keys=[user_id])
+
+
+# ──────────────────────────────────────────────
+# Langues parlées (profil utilisateur)
+# ──────────────────────────────────────────────
+
+class ProfilLangue(AuditMixin, Base):
+    """Langues parlées par l'utilisateur, avec niveau CEFR."""
+    __tablename__ = "profil_langue"
+
+    id      = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid, ForeignKey("user.id"), nullable=False)
+    nom     = Column(String(100), nullable=False)   # ex: "Anglais", "Espagnol"
+    niveau  = Column(Enum(CEFRLevelEnum), nullable=False)
+
+    # Relations
+    user = relationship("User", back_populates="profil_langues", foreign_keys=[user_id])
 
 
 # ──────────────────────────────────────────────
@@ -289,6 +327,7 @@ class Competence(TranslatableMixin, AuditMixin, Base):
     nom     = Column(String(150), nullable=False)
     type    = Column(Enum(SkillTypeEnum),  nullable=False)
     niveau  = Column(Enum(SkillLevelEnum), nullable=False)
+    famille = Column(String(150), nullable=True)   # Famille de compétence (à renseigner ultérieurement)
 
     # Relations
     user     = relationship("User",     back_populates="competences", foreign_keys=[user_id])
