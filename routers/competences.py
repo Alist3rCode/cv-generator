@@ -109,6 +109,7 @@ def edit_competence_page(
 @router.post("/{cid}/edit")
 def update_competence(
     cid: str,
+    request: Request,
     nom: str         = Form(...),
     type: str        = Form(...),
     niveau: int      = Form(...),
@@ -137,6 +138,8 @@ def update_competence(
             type=SkillTypeEnum(type), niveau=SkillLevelEnum(niveau),
         ))
     db.commit()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({"ok": True})
     return RedirectResponse(url=f"/competences/{cid}/edit?language_id={language_id}", status_code=303)
 
 

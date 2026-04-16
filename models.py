@@ -372,7 +372,7 @@ class CVExport(AuditMixin, Base):
 
     id           = Column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id      = Column(Uuid, ForeignKey("user.id"),      nullable=False)
-    template_id  = Column(Uuid, ForeignKey("template.id"),  nullable=False)
+    template_id  = Column(Uuid, ForeignKey("template.id"),  nullable=True)
     language_id  = Column(Uuid, ForeignKey("language.id"),  nullable=False)
     format       = Column(Enum(ExportFormatEnum), nullable=False)
     nom          = Column(String(200), nullable=True)        # Nom personnalisé de l'export

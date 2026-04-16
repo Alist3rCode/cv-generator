@@ -15,6 +15,7 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <form method="post" id="mainForm"
+          data-autosave-mode="{% if source_id %}edit{% else %}create{% endif %}"
           action="{% if source_id %}/experiences/{{ source_id }}/edit{% else %}/experiences/new{% endif %}">
 
       {% if source_id and gid %}
@@ -174,12 +175,18 @@
         </div>{# /row #}
       </div>{# /skill picker #}
 
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-save btn-outline-secondary" id="saveBtn">
-          <i class="bi bi-save"></i> Enregistrer
-        </button>
+      {% if not source_id %}
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary" id="saveBtn"><i class="bi bi-save"></i> Enregistrer</button>
         <a href="/experiences/" class="btn btn-outline-secondary">Annuler</a>
       </div>
+      {% else %}
+      <div class="mt-2">
+        <a href="/experiences/" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left"></i> Retour à la liste
+        </a>
+      </div>
+      {% endif %}
     </form>
   </div>
 </div>
@@ -193,33 +200,24 @@
     placeholder: 'Décrivez vos missions, responsabilités...',
     modules: { toolbar: [['bold','italic','underline'],[{list:'ordered'},{list:'bullet'}],['clean']] }
   });
-  var descInput   = document.getElementById('description-input');
-  var originalDesc = descInput.value;
-  var form    = document.getElementById('mainForm');
-  var saveBtn = document.getElementById('saveBtn');
+  var descInput = document.getElementById('description-input');
+  var form      = document.getElementById('mainForm');
+  var saveBtn   = document.getElementById('saveBtn'); // null en mode edit
 
-  form.addEventListener('submit', function() {
-    descInput.value = quill.root.innerHTML;
-    syncHiddenInputs();
-    window.__formDirty = false;
-  });
+  // Sync Quill avant toute soumission
+  function syncQuill() { descInput.value = quill.root.innerHTML; }
 
-  // Tracking des changements
-  var inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
-  inputs.forEach(function(el) { el.dataset.original = el.value; });
-
-  function checkChanges() {
-    var inputChanged = Array.from(inputs).some(function(el) { return el.value !== el.dataset.original; });
-    var quillHtml    = quill.root.innerHTML;
-    var quillChanged = quillHtml !== originalDesc && !(originalDesc === '' && quillHtml === '<p><br></p>');
-    var changed = inputChanged || quillChanged;
-    saveBtn.classList.toggle('btn-primary', changed);
-    saveBtn.classList.toggle('btn-outline-secondary', !changed);
-    document.querySelectorAll('.lang-tab-btn.active').forEach(function(t) { t.classList.toggle('lang-unsaved', changed); });
-    window.__formDirty = changed;
+  if (saveBtn) {
+    // Mode création : soumission traditionnelle
+    form.addEventListener('submit', function() { syncQuill(); syncHiddenInputs(); window.__formDirty = false; });
+  } else {
+    // Mode édition : auto-save
+    initAutoSave(form, {
+      beforeSubmit: function() { syncQuill(); syncHiddenInputs(); },
+      quill:        quill,
+      quillHidden:  descInput,
+    });
   }
-  inputs.forEach(function(el) { el.addEventListener('input', checkChanges); });
-  quill.on('text-change', checkChanges);
 
   // ── Autocomplete localisation (Nominatim) ────────────────────────────
   initLocationAutocomplete(

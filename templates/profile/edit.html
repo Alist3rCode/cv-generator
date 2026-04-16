@@ -7,7 +7,8 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" action="/profile/edit{% if active_language %}?language_id={{ active_language.id }}{% endif %}" id="profileForm">
+    <form method="post" action="/profile/edit{% if active_language %}?language_id={{ active_language.id }}{% endif %}"
+          id="profileForm" data-autosave-mode="edit">
       <input type="hidden" name="language_id" value="{{ active_language.id if active_language else '' }}" />
 
       <!-- Infos fixes -->
@@ -131,11 +132,10 @@
         </div>
       </div>
 
-      <div class="d-flex gap-2 mt-3">
-        <button type="submit" class="btn btn-save btn-outline-secondary" id="saveBtn">
-          <i class="bi bi-save"></i> Enregistrer
-        </button>
-        <a href="/dashboard" class="btn btn-outline-secondary">Annuler</a>
+      <div class="mt-2">
+        <a href="/dashboard" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left"></i> Retour au tableau de bord
+        </a>
       </div>
     </form>
   </div>
@@ -143,53 +143,46 @@
 
 <script>
 (function() {
-  // ── Ajout / suppression de lignes de langue ──────────────────────────────
-  const languesList  = document.getElementById('languesList');
-  const addLangueBtn = document.getElementById('addLangueBtn');
-  const langueRowTpl = document.getElementById('langueRowTpl');
+  var form       = document.getElementById('profileForm');
+  var langsList  = document.getElementById('languesList');
+  var addBtn     = document.getElementById('addLangueBtn');
+  var rowTpl     = document.getElementById('langueRowTpl');
+  if (!form) return;
 
-  function bindRemoveBtn(row) {
+  // Init auto-save sur les champs statiques
+  initAutoSave(form);
+
+  // ── Ajout / suppression de lignes langue ─────────────────────────────────
+  function bindRow(row) {
+    // Wrapper les nouveaux champs dynamiques
+    var input = row.querySelector('input[name="langue_noms"]');
+    var sel   = row.querySelector('select[name="langue_niveaux"]');
+    if (input) asWrapInput(input, form);
+    if (sel)   asBindSelect(sel, form);
+
     row.querySelector('.remove-langue-btn').addEventListener('click', function() {
       row.remove();
-      checkChanges();
+      // Sauvegarde immédiate après suppression d'une ligne
+      var fd = new FormData(form);
+      fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, body: fd });
     });
   }
 
-  // Lier les boutons sur les lignes existantes
-  languesList.querySelectorAll('.langue-row').forEach(bindRemoveBtn);
-
-  addLangueBtn.addEventListener('click', function() {
-    const clone = langueRowTpl.content.cloneNode(true).querySelector('.langue-row');
-    bindRemoveBtn(clone);
-    languesList.appendChild(clone);
-    clone.querySelector('input[name="langue_noms"]').focus();
-    checkChanges();
+  // Lier les lignes existantes (leurs champs sont déjà wrappés par initAutoSave)
+  langsList.querySelectorAll('.langue-row').forEach(function(row) {
+    row.querySelector('.remove-langue-btn').addEventListener('click', function() {
+      row.remove();
+      var fd = new FormData(form);
+      fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, body: fd });
+    });
   });
 
-  // ── Détection des changements ─────────────────────────────────────────────
-  const form    = document.getElementById('profileForm');
-  const saveBtn = document.getElementById('saveBtn');
-  if (!form || !saveBtn) return;
-
-  const staticInputs = form.querySelectorAll('input:not([disabled]), textarea:not([disabled])');
-  staticInputs.forEach(el => { el.dataset.original = el.value; });
-
-  function checkChanges() {
-    const allInputs = form.querySelectorAll('input:not([disabled]), textarea:not([disabled]), select');
-    const changed = [...allInputs].some(el => el.dataset.original === undefined || el.value !== el.dataset.original);
-    if (changed) {
-      saveBtn.classList.replace('btn-outline-secondary', 'btn-primary');
-      document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.add('lang-unsaved'));
-      window.__formDirty = true;
-    } else {
-      saveBtn.classList.replace('btn-primary', 'btn-outline-secondary');
-      document.querySelectorAll('.lang-tab-btn.active').forEach(t => t.classList.remove('lang-unsaved'));
-      window.__formDirty = false;
-    }
-  }
-
-  staticInputs.forEach(el => el.addEventListener('input', checkChanges));
-  form.addEventListener('change', checkChanges);
+  addBtn.addEventListener('click', function() {
+    var clone = rowTpl.content.cloneNode(true).querySelector('.langue-row');
+    langsList.appendChild(clone);
+    bindRow(clone);
+    clone.querySelector('input[name="langue_noms"]').focus();
+  });
 })();
 </script>
 {{ unsaved_guard("profileForm") }}

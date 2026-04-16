@@ -263,12 +263,12 @@ def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
             r_end  = pos + len(r_text)
 
             if r_end <= marker_start:
-                # Entièrement avant le marker
+                # Entièrement avant le marker — copié dans un para "before"
                 before_runs.append(copy.deepcopy(r))
 
             elif pos >= marker_end:
-                # Entièrement après le marker
-                after_runs.append(copy.deepcopy(r))
+                # Entièrement après le marker — on garde l'élément ORIGINAL
+                after_runs.append(r)
 
             else:
                 # Ce run chevauche le marker — on note son formatage
@@ -283,27 +283,32 @@ def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
                 # Texte de ce run qui suit le marker
                 suf = full_text[marker_end: r_end]
                 if r_end > marker_end and suf:
-                    after_runs.insert(
-                        len([x for x in after_runs]),  # append au début des after
-                        _make_run_xml(r, suf, False, False, False)
-                    )
+                    # Insérer au début des after_runs (avant ceux déjà collectés)
+                    after_runs.insert(0, _make_run_xml(r, suf, False, False, False))
 
             pos = r_end
 
+        # ── Étape clé : réutiliser p_el pour les after_runs ──────────────────
+        # Supprimer TOUS les runs de p_el
+        for r in all_runs:
+            if r.getparent() is not None:
+                p_el.remove(r)
+        # Ré-attacher les after_runs ORIGINAUX à p_el (conserve namespace + formatage)
+        for r in after_runs:
+            p_el.append(r)
+
+        # ── Construire les paragraphes HTML à insérer AVANT p_el ─────────────
         blocks = _parse_html_blocks(html or "")
 
-        def _make_p_with_runs(runs):
-            new_p = etree.Element(qn("w:p"))
-            if ppr_el is not None:
-                new_p.append(copy.deepcopy(ppr_el))
-            for r in runs:
-                new_p.append(r)
-            return new_p
-
-        new_els = []
+        html_els = []
 
         if before_runs:
-            new_els.append(_make_p_with_runs(before_runs))
+            before_p = etree.Element(qn("w:p"))
+            if ppr_el is not None:
+                before_p.append(copy.deepcopy(ppr_el))
+            for r in before_runs:
+                before_p.append(r)
+            html_els.append(before_p)
 
         if blocks:
             for block in blocks:
@@ -314,17 +319,19 @@ def _replace_html_field_in_cell(cell, marker: str, html: str) -> None:
                     new_p.append(_make_run_xml(desc_run_el, block["prefix"], False, False, False))
                 for run in block["runs"]:
                     new_p.append(_make_run_xml(desc_run_el, run["text"], run["bold"], run["italic"], run["underline"]))
-                new_els.append(new_p)
+                html_els.append(new_p)
+        else:
+            # HTML vide → insérer un paragraphe vide à la place
+            html_els.append(etree.Element(qn("w:p")))
 
-        if after_runs:
-            new_els.append(_make_p_with_runs(after_runs))
+        # Insérer les paragraphes HTML juste avant p_el
+        for i, hp in enumerate(html_els):
+            parent.insert(insert_idx + i, hp)
 
-        if not new_els:
-            new_els.append(etree.Element(qn("w:p")))
-
-        for i, new_p in enumerate(new_els):
-            parent.insert(insert_idx + i, new_p)
-        parent.remove(p_el)
+        # p_el reste en place uniquement s'il contient des after_runs à traiter.
+        # Sans after_runs il est vide et doit être supprimé pour éviter un saut de ligne parasite.
+        if not after_runs:
+            parent.remove(p_el)
         return
 
     # Récursion sur les tableaux imbriqués
@@ -458,6 +465,20 @@ def _replace_in_cell(cell, replacements: dict[str, str]) -> None:
                 _replace_in_cell(c, replacements)
 
 
+def _remove_empty_replaced_paragraphs(row) -> None:
+    """
+    Supprime les paragraphes qui sont devenus vides après fusion des balises.
+    Un paragraphe "devenu vide" a au moins un run mais tous ses runs ont un texte vide.
+    Un paragraphe vide naturel (sans aucun run) est préservé — c'est un saut de ligne voulu.
+    """
+    for cell in row.cells:
+        for para in list(cell.paragraphs):
+            p_el = para._p
+            runs = p_el.findall(qn("w:r"))
+            if runs and all(not _run_text(r) for r in runs):
+                p_el.getparent().remove(p_el)
+
+
 def _find_template_row(table, marker: str):
     """Retourne la première ligne du tableau contenant le marqueur."""
     for row in table.rows:
@@ -534,6 +555,9 @@ def _expand_table_section(
             # 2. Remplacement textuel simple sur le reste (hors champs HTML)
             simple_item = {k: v for k, v in item.items() if k not in html_fields}
             _fill_row(new_row, simple_item)
+
+            # 3. Nettoyer les paragraphes devenus vides après fusion
+            _remove_empty_replaced_paragraphs(new_row)
 
         # Supprimer la ligne modèle (maintenant décalée de len(items) positions)
         tbl.remove(tr_el)
@@ -617,9 +641,9 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
             "{{EXP_SUMMARY}}":     e.project_summary or "",
             "{{EXP_DESC}}":        e.description or "",
             "{{EXP_DUREE}}":       _fmt_duration(e.date_debut, e.date_fin),
-            "{{EXP_HARD_TITRE}}":  "\nEnvironnement Technique : " if hard_noms else "",
+            "{{EXP_HARD_TITRE}}":  "Environnement Technique : " if hard_noms else "",
             "{{EXP_HARD_NOM}}":    ", ".join(hard_noms),
-            "{{EXP_SOFT_TITRE}}":  "\nEnvironnement Fonctionnel : " if soft_noms else "",
+            "{{EXP_SOFT_TITRE}}":  "Environnement Fonctionnel : " if soft_noms else "",
             "{{EXP_SOFT_NOM}}":    ", ".join(soft_noms),
         })
     _expand_table_section(

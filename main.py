@@ -3,15 +3,67 @@ main.py — Point d'entrée FastAPI
 CV Generator App
 """
 
+import logging
+import traceback
+
 from fastapi import FastAPI, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
+
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
+logger = logging.getLogger("cv_generator")
 
 from database import init_db, SessionLocal
 from routers import auth, users, profile, experiences, formations, certifications, competences, templates, exports, admin
 
 app = FastAPI(title="CV Generator", version="1.0.0")
+
+# Templates Jinja2 — déclaré tôt pour les exception handlers
+templates_jinja = Jinja2Templates(directory="templates")
+
+from fastapi import HTTPException
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+_ERROR_MESSAGES = {
+    400: ("Requête invalide",        "La requête envoyée est incorrecte ou mal formée."),
+    401: ("Non authentifié",         "Vous devez être connecté pour accéder à cette page."),
+    403: ("Accès refusé",            "Vous n'avez pas les droits nécessaires pour accéder à cette ressource."),
+    404: ("Page introuvable",        "La page que vous cherchez n'existe pas ou a été déplacée."),
+    500: ("Erreur serveur",          "Une erreur interne s'est produite. Réessayez dans quelques instants."),
+}
+
+async def _render_error(request: Request, status_code: int, detail: str = ""):
+    if status_code in (301, 302, 303, 307, 308):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=detail or "/", status_code=status_code)
+    title, msg = _ERROR_MESSAGES.get(status_code, ("Erreur", detail))
+    return templates_jinja.TemplateResponse("error.html", {
+        "request":     request,
+        "status_code": status_code,
+        "title":       title,
+        "detail":      msg,
+    }, status_code=status_code)
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return await _render_error(request, exc.status_code, str(exc.detail))
+
+@app.exception_handler(HTTPException)
+async def fastapi_exception_handler(request: Request, exc: HTTPException):
+    return await _render_error(request, exc.status_code, str(exc.detail))
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    logger.error("Unhandled exception on %s\n%s", request.url, tb)
+    return templates_jinja.TemplateResponse("error.html", {
+        "request":     request,
+        "status_code": 500,
+        "title":       "Erreur serveur",
+        "detail":      "Une erreur interne s'est produite. Réessayez dans quelques instants.",
+    }, status_code=500)
 
 
 class AdminContextMiddleware(BaseHTTPMiddleware):
@@ -49,10 +101,6 @@ app.add_middleware(AdminContextMiddleware)
 
 # Fichiers statiques (CSS, JS, images)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Templates Jinja2
-templates_jinja = Jinja2Templates(directory="templates")
-
 
 def _exp_duration_filter(exp):
     """Filtre Jinja2 : calcule la durée d'une expérience en texte lisible."""

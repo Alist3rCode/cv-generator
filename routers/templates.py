@@ -116,12 +116,8 @@ def delete_template(tid: str, db: Session = Depends(get_db), current_user: User 
     from models import CVExport
     t = db.query(Template).filter(Template.id == uuid.UUID(tid)).first()
     if t:
-        # Supprimer les exports liés (template_id NOT NULL) avant de supprimer le template
-        exports = db.query(CVExport).filter(CVExport.template_id == t.id).all()
-        for export in exports:
-            if export.fichier_path:
-                Path(export.fichier_path).unlink(missing_ok=True)
-            db.delete(export)
+        # Détacher les exports liés sans les supprimer (historique conservé)
+        db.query(CVExport).filter(CVExport.template_id == t.id).update({"template_id": None})
         db.flush()
         Path(t.fichier_path).unlink(missing_ok=True)
         db.delete(t)

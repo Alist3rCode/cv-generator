@@ -254,6 +254,8 @@ def update_experience(
         t.soft_skills = soft_skills or None
 
     db.commit()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({"ok": True})
     return RedirectResponse(url=f"/experiences/{exp_id}/edit?language_id={language_id}", status_code=303)
 
 

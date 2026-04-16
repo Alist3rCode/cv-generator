@@ -7,7 +7,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -116,6 +116,7 @@ def edit_formation_page(
 @router.post("/{fid}/edit")
 def update_formation(
     fid: str,
+    request: Request,
     diplome: str              = Form(...),
     etablissement: str        = Form(...),
     ville: Optional[str]      = Form(None),
@@ -149,6 +150,8 @@ def update_formation(
             date_debut=_parse_date(date_debut), date_fin=_parse_date(date_fin), description=description or None,
         ))
     db.commit()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({"ok": True})
     return RedirectResponse(url=f"/formations/{fid}/edit?language_id={language_id}", status_code=303)
 
 

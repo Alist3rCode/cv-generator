@@ -8,6 +8,7 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <form method="post" id="mainForm"
+          data-autosave-mode="{% if source_id %}edit{% else %}create{% endif %}"
           action="{% if source_id %}/formations/{{ source_id }}/edit{% else %}/formations/new{% endif %}">
 
       {% if source_id and gid %}
@@ -67,38 +68,34 @@
       </div>
 
 
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-save btn-outline-secondary" id="saveBtn">
-          <i class="bi bi-save"></i> Enregistrer
-        </button>
+      {% if not source_id %}
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Enregistrer</button>
         <a href="/formations/" class="btn btn-outline-secondary">Annuler</a>
       </div>
+      {% else %}
+      <div class="mt-2">
+        <a href="/formations/" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left"></i> Retour à la liste
+        </a>
+      </div>
+      {% endif %}
     </form>
   </div>
 </div>
 
 <script>
 (function() {
-  var form    = document.getElementById('mainForm');
-  var saveBtn = document.getElementById('saveBtn');
-  if (!form || !saveBtn) return;
-  var inputs = form.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, select');
-  inputs.forEach(function(el) { el.dataset.original = el.value; });
-  function checkChanges() {
-    var changed = Array.from(inputs).some(function(el) { return el.value !== el.dataset.original; });
-    saveBtn.classList.toggle('btn-primary', changed);
-    saveBtn.classList.toggle('btn-outline-secondary', !changed);
-    window.__formDirty = changed;
-    document.querySelectorAll('.lang-tab-btn.active').forEach(function(t) { t.classList.toggle('lang-unsaved', changed); });
-  }
-  inputs.forEach(function(el) { el.addEventListener('input', checkChanges); });
-
-  // Autocomplete ville via Nominatim
+  var form = document.getElementById('mainForm');
+  if (!form) return;
+  {% if source_id %}
+  initAutoSave(form);
+  {% endif %}
   if (document.getElementById('villeInput')) {
     initLocationAutocomplete(
       document.getElementById('villeInput'),
       document.getElementById('villeSuggestions'),
-      checkChanges
+      function() {}
     );
   }
 })();

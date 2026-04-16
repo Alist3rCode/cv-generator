@@ -106,6 +106,8 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
         for w in cloud_words:
             w["size"] = round(1 + (w["weight"] / max_w) * 9, 2)
 
+    langue_count = db.query(ProfilLangue).filter(ProfilLangue.user_id == current_user.id).count()
+
     from datetime import date as _date
     return templates.TemplateResponse("profile/dashboard.html", {
         "request":        request,
@@ -121,6 +123,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
         "soft_count":     soft_count,
         "now_year":       _date.today().year,
         "cloud_words":    cloud_words,
+        "langue_count":   langue_count,
     })
 
 
@@ -249,5 +252,8 @@ def edit_profile(
                 db.add(bio)
 
     db.commit()
+    if request.headers.get("X-Requested-With") == "fetch":
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"ok": True})
     redirect_lang = f"?language_id={language_id}" if language_id else ""
     return RedirectResponse(url=f"/profile/edit{redirect_lang}", status_code=303)

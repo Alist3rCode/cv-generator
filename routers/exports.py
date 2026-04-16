@@ -145,6 +145,17 @@ def download_export(export_id: str, db: Session = Depends(get_db), current_user:
     return FileResponse(export.fichier_path, filename=filename)
 
 
+@router.post("/delete-all")
+def delete_all_exports(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    exports = db.query(CVExport).filter(CVExport.user_id == current_user.id).all()
+    for export in exports:
+        if export.fichier_path:
+            Path(export.fichier_path).unlink(missing_ok=True)
+        db.delete(export)
+    db.commit()
+    return RedirectResponse(url="/exports/", status_code=303)
+
+
 @router.post("/{export_id}/delete")
 def delete_export(export_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     export = db.query(CVExport).filter(

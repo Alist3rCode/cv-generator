@@ -7,7 +7,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -113,6 +113,7 @@ def edit_certification_page(
 @router.post("/{cid}/edit")
 def update_certification(
     cid: str,
+    request: Request,
     titre: str                = Form(...),
     organisme: str            = Form(...),
     date_obtention: str       = Form(...),
@@ -143,6 +144,8 @@ def update_certification(
             date_obtention=_parse_date(date_obtention), date_fin=_parse_date(date_fin),
         ))
     db.commit()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({"ok": True})
     return RedirectResponse(url=f"/certifications/{cid}/edit?language_id={language_id}", status_code=303)
 
 

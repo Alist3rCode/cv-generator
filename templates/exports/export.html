@@ -56,7 +56,14 @@
 {% endif %}
 
 {% if previous_exports %}
-<h5 class="mb-3 mt-5">Exports récents</h5>
+<div class="d-flex justify-content-between align-items-center mb-3 mt-5">
+  <h5 class="mb-0">Exports récents</h5>
+  <form method="post" action="/exports/delete-all" onsubmit="return confirm('Supprimer tous les exports ?')">
+    <button type="submit" class="btn btn-sm btn-outline-danger">
+      <i class="bi bi-trash"></i> Tout supprimer
+    </button>
+  </form>
+</div>
 <div class="card shadow-sm" id="exportsHistoryCard">
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0" id="exportsHistory">
@@ -94,6 +101,13 @@
         {% endfor %}
       </tbody>
     </table>
+  </div>
+  <div class="card-footer d-flex justify-content-end py-2">
+    <form method="post" action="/exports/delete-all" onsubmit="return confirm('Supprimer tous les exports ?')">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash"></i> Tout supprimer
+      </button>
+    </form>
   </div>
 </div>
 {% endif %}
