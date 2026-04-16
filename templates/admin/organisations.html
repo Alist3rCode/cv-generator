@@ -1,0 +1,56 @@
+{% extends "admin/layout.html" %}
+{% block title %}Sociétés — Administration{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4><i class="bi bi-building"></i> Sociétés</h4>
+  <a href="/admin/organisations/new" class="btn btn-success btn-sm">
+    <i class="bi bi-plus-lg"></i> Nouvelle société
+  </a>
+</div>
+
+{% if not orgs %}
+<div class="alert alert-info">Aucune société enregistrée.</div>
+{% else %}
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Nom</th>
+          <th>Email</th>
+          <th>Téléphone</th>
+          <th class="text-center">Membres</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for org in orgs %}
+        <tr>
+          <td class="fw-semibold">{{ org.nom }}</td>
+          <td class="text-muted small">{{ org.email or '—' }}</td>
+          <td class="text-muted small">{{ org.telephone or '—' }}</td>
+          <td class="text-center">
+            <span class="badge bg-secondary">{{ member_counts.get(org.id | string, 0) }}</span>
+          </td>
+          <td class="text-end">
+            <div class="d-flex gap-2 justify-content-end">
+              <a href="/admin/organisations/{{ org.id }}/edit" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil"></i> Gérer
+              </a>
+              <form method="post" action="/admin/organisations/{{ org.id }}/delete"
+                    onsubmit="return confirm('Supprimer « {{ org.nom }} » et retirer tous ses membres ?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="admin-shell">
+
+  <!-- ── Sous-sidebar Administration ─────────────────────────────── -->
+  <aside class="admin-subnav">
+    <div class="admin-subnav-title">
+      <i class="bi bi-shield-lock"></i>
+      <span>Administration</span>
+    </div>
+
+    <nav class="admin-subnav-links">
+      <a href="/admin/organisations"
+         class="admin-subnav-link {% if '/admin/organisations' in request.url.path %}active{% endif %}">
+        <i class="bi bi-building"></i> Sociétés
+      </a>
+      <a href="/admin/users"
+         class="admin-subnav-link {% if '/admin/users' in request.url.path %}active{% endif %}">
+        <i class="bi bi-people"></i> Utilisateurs
+      </a>
+      <a href="/templates/"
+         class="admin-subnav-link {% if '/templates' in request.url.path %}active{% endif %}">
+        <i class="bi bi-layout-text-window"></i> Templates Word
+      </a>
+      <a href="/admin/trash"
+         class="admin-subnav-link {% if '/admin/trash' in request.url.path %}active{% endif %}">
+        <i class="bi bi-trash"></i> Corbeille
+        {% if trash_count is defined and trash_count > 0 %}
+        <span class="badge bg-danger ms-auto">{{ trash_count }}</span>
+        {% endif %}
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ── Contenu principal ────────────────────────────────────────── -->
+  <div class="admin-content">
+    {% block admin_content %}{% endblock %}
+  </div>
+
+</div>
+{% endblock %}
