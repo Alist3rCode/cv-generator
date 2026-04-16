@@ -359,52 +359,82 @@ def _fmt_duration(start, end=None) -> str:
     return " ".join(parts) if parts else "< 1 mois"
 
 
-def _replace_in_paragraph(para, replacements: dict[str, str]) -> None:
+def _apply_run_text(run, text: str) -> None:
     """
-    Remplace les balises dans un paragraphe en gérant le split Word.
-
-    Word décompose souvent {{NOM}} en plusieurs runs (ex: '{{', 'NOM', '}}')
-    pour des raisons de formatage interne. On fusionne d'abord le texte de
-    tous les runs, on effectue les remplacements, puis on met le résultat
-    dans le premier run et on vide les autres (en conservant leur XML pour
-    ne pas casser la structure).
+    Applique `text` à un run en gérant les \\n → <w:br/>.
+    Préserve toutes les autres propriétés XML du run (police, couleur, taille…).
     """
-    if not para.runs:
-        return
-
-    # Vérifier si une balise est présente (évite de toucher les paragraphes propres)
-    full_text = "".join(r.text for r in para.runs)
-    if not any(key in full_text for key in replacements):
-        return
-
-    # Appliquer tous les remplacements sur le texte fusionné
-    new_text = full_text
-    for key, value in replacements.items():
-        new_text = new_text.replace(key, value or "")
-
-    # Mettre le texte final dans le premier run, vider les autres.
-    # Si new_text contient des \n, on les convertit en <w:br/> dans le XML du run.
-    first_run = para.runs[0]
-    if "\n" in new_text:
-        r_el = first_run._r
-        # Supprimer le <w:t> existant et tout <w:br> résiduel
-        for child in list(r_el):
-            if child.tag in (qn("w:t"), qn("w:br")):
-                r_el.remove(child)
-        # Reconstruire avec des <w:br/> aux bons endroits
-        parts = new_text.split("\n")
-        for idx, part in enumerate(parts):
+    r_el = run._r
+    for child in list(r_el):
+        if child.tag in (qn("w:t"), qn("w:br")):
+            r_el.remove(child)
+    if "\n" not in text:
+        if text:
+            t = etree.SubElement(r_el, qn("w:t"))
+            t.text = text
+            if text.startswith(" ") or text.endswith(" "):
+                t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    else:
+        for idx, part in enumerate(text.split("\n")):
             if idx > 0:
-                br = etree.SubElement(r_el, qn("w:br"))
+                etree.SubElement(r_el, qn("w:br"))
             if part:
                 t = etree.SubElement(r_el, qn("w:t"))
                 t.text = part
                 if part.startswith(" ") or part.endswith(" "):
                     t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
-    else:
-        first_run.text = new_text
-    for run in para.runs[1:]:
-        run.text = ""
+
+
+def _replace_in_paragraph(para, replacements: dict[str, str]) -> None:
+    """
+    Remplace les balises dans un paragraphe en préservant le formatage de chaque run.
+
+    Passe 1 — remplacement direct dans chaque run qui contient la balise en entier :
+      le formatage (police, couleur, gras…) du run est totalement préservé.
+
+    Passe 2 — balises splittées sur plusieurs runs (Word découpe parfois {{NOM}}
+      en '{{', 'NOM', '}}') : on fusionne le minimum de runs nécessaires en
+      conservant le formatage du premier run du groupe.
+    """
+    if not para.runs:
+        return
+
+    full_text = "".join(r.text for r in para.runs)
+    if not any(key in full_text for key in replacements):
+        return
+
+    # Passe 1 : remplacement dans les runs qui contiennent la balise entière
+    for run in para.runs:
+        if not any(key in run.text for key in replacements):
+            continue
+        new_text = run.text
+        for key, value in replacements.items():
+            new_text = new_text.replace(key, value or "")
+        _apply_run_text(run, new_text)
+
+    # Passe 2 : balises encore présentes (splittées sur plusieurs runs)
+    full_text = "".join(r.text for r in para.runs)
+    split_markers = [k for k in replacements if k in full_text]
+    if not split_markers:
+        return
+
+    for marker in split_markers:
+        value = replacements[marker] or ""
+        runs = list(para.runs)
+        for start in range(len(runs)):
+            accumulated = ""
+            for end in range(start, len(runs)):
+                accumulated += runs[end].text
+                if marker in accumulated:
+                    # Fusionner uniquement runs[start:end+1]
+                    new_text = accumulated.replace(marker, value)
+                    _apply_run_text(runs[start], new_text)
+                    for i in range(start + 1, end + 1):
+                        runs[i].text = ""
+                    break
+            else:
+                continue
+            break
 
 
 def _replace_in_doc(doc: Document, replacements: dict[str, str]) -> None:

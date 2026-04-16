@@ -59,20 +59,22 @@ class ExportFormatEnum(PyEnum):
 
 
 class CEFRLevelEnum(PyEnum):
-    A1 = "A1"
-    A2 = "A2"
-    B1 = "B1"
-    B2 = "B2"
-    C1 = "C1"
-    C2 = "C2"
+    A1     = "A1"
+    A2     = "A2"
+    B1     = "B1"
+    B2     = "B2"
+    C1     = "C1"
+    C2     = "C2"
+    NATIVE = "NATIVE"
 
 CEFR_LABELS = {
-    "A1": "A1 — Débutant",
-    "A2": "A2 — Élémentaire",
-    "B1": "B1 — Intermédiaire",
-    "B2": "B2 — Intermédiaire avancé",
-    "C1": "C1 — Autonome",
-    "C2": "C2 — Maîtrise",
+    "A1":     "A1 — Débutant",
+    "A2":     "A2 — Élémentaire",
+    "B1":     "B1 — Intermédiaire",
+    "B2":     "B2 — Intermédiaire avancé",
+    "C1":     "C1 — Autonome",
+    "C2":     "C2 — Maîtrise",
+    "NATIVE": "Langue maternelle",
 }
 
 
