@@ -329,7 +329,8 @@ class Competence(TranslatableMixin, AuditMixin, Base):
     nom     = Column(String(150), nullable=False)
     type    = Column(Enum(SkillTypeEnum),  nullable=False)
     niveau  = Column(Enum(SkillLevelEnum), nullable=False)
-    famille = Column(String(150), nullable=True)   # Famille de compétence (à renseigner ultérieurement)
+    famille    = Column(String(150), nullable=True)   # Famille de compétence (à renseigner ultérieurement)
+    deleted_at = Column(DateTime,    nullable=True)   # NULL = actif
 
     # Relations
     user     = relationship("User",     back_populates="competences", foreign_keys=[user_id])

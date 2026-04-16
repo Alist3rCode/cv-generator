@@ -46,6 +46,20 @@ def export_page(request: Request, db: Session = Depends(get_db), current_user: U
         .all()
     )
 
+    # Langues ayant au moins une donnée (expérience, formation, certification ou bio)
+    langs_with_data = set()
+    for lang in languages:
+        lid = lang.id
+        has_exp  = db.query(Experience).filter(Experience.user_id == current_user.id, Experience.language_id == lid, Experience.deleted_at == None).first()
+        has_form = db.query(Formation).filter(Formation.user_id == current_user.id, Formation.language_id == lid, Formation.deleted_at == None).first()
+        has_cert = db.query(Certification).filter(Certification.user_id == current_user.id, Certification.language_id == lid, Certification.deleted_at == None).first()
+        has_bio  = db.query(Bio).filter(Bio.user_id == current_user.id, Bio.language_id == lid).first()
+        if has_exp or has_form or has_cert or has_bio:
+            langs_with_data.add(str(lid))
+
+    # Langue par défaut : français (code 'fr'), sinon première
+    default_lang = next((l for l in languages if l.code == 'fr'), languages[0] if languages else None)
+
     return templates.TemplateResponse("exports/export.html", {
         "request": request,
         "current_user": current_user,
@@ -53,6 +67,8 @@ def export_page(request: Request, db: Session = Depends(get_db), current_user: U
         "active_templates": active_templates,
         "previous_exports": previous_exports,
         "formats": ExportFormatEnum,
+        "langs_with_data": langs_with_data,
+        "default_lang_id": str(default_lang.id) if default_lang else "",
     })
 
 
@@ -124,12 +140,15 @@ def generate_export(
 
     # Si appelé via fetch (JS), retourner JSON pour mise à jour sans rechargement
     if request.headers.get("X-Requested-With") == "fetch":
+        lang_obj = db.query(Language).filter(Language.id == lang_uuid).first()
         return JSONResponse({
             "export_id":    str(export_id),
             "nom":          export_nom,
             "format":       export_fmt.value,
             "generated_at": now.strftime("%d/%m/%Y %H:%M"),
             "download_url": f"/exports/{export_id}/download",
+            "lang_code":    lang_obj.code if lang_obj else "",
+            "lang_nom":     lang_obj.nom if lang_obj else "",
         })
 
     return RedirectResponse(url=f"/exports/{export_id}/download", status_code=303)

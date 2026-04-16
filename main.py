@@ -35,9 +35,6 @@ _ERROR_MESSAGES = {
 }
 
 async def _render_error(request: Request, status_code: int, detail: str = ""):
-    if status_code in (301, 302, 303, 307, 308):
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=detail or "/", status_code=status_code)
     title, msg = _ERROR_MESSAGES.get(status_code, ("Erreur", detail))
     return templates_jinja.TemplateResponse("error.html", {
         "request":     request,
@@ -48,10 +45,18 @@ async def _render_error(request: Request, status_code: int, detail: str = ""):
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code in (301, 302, 303, 307, 308):
+        from fastapi.responses import RedirectResponse
+        location = (exc.headers or {}).get("Location", "/")
+        return RedirectResponse(url=location, status_code=exc.status_code)
     return await _render_error(request, exc.status_code, str(exc.detail))
 
 @app.exception_handler(HTTPException)
 async def fastapi_exception_handler(request: Request, exc: HTTPException):
+    if exc.status_code in (301, 302, 303, 307, 308):
+        from fastapi.responses import RedirectResponse
+        location = (exc.headers or {}).get("Location", "/")
+        return RedirectResponse(url=location, status_code=exc.status_code)
     return await _render_error(request, exc.status_code, str(exc.detail))
 
 @app.exception_handler(Exception)

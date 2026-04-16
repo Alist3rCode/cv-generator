@@ -164,7 +164,7 @@ document.getElementById('deleteModalConfirmBtn').addEventListener('click', funct
 
 function _doDelete(cid) {
   var fd = new FormData();
-  fetch('/competences/' + cid + '/delete', { method: 'POST', body: fd })
+  fetch('/competences/' + cid + '/soft-delete', { method: 'POST', body: fd })
     .then(function(r) {
       if (r.ok || r.redirected) {
         window.location.href = '/competences/';

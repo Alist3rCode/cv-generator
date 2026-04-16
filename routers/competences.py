@@ -3,6 +3,7 @@ routers/competences.py — CRUD compétences (multi-langue via GID)
 """
 
 import uuid
+import datetime as _dt
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -29,7 +30,7 @@ def _dedup_by_gid(items):
 
 @router.get("/", response_class=HTMLResponse)
 def list_competences(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    all_items   = db.query(Competence).filter(Competence.user_id == current_user.id).order_by(Competence.type, Competence.nom).all()
+    all_items   = db.query(Competence).filter(Competence.user_id == current_user.id, Competence.deleted_at == None).order_by(Competence.type, Competence.nom).all()
     competences = _dedup_by_gid(all_items)
     if not competences:
         return RedirectResponse(url="/competences/new", status_code=302)
@@ -174,8 +175,37 @@ def get_competence_usage(cid: str, db: Session = Depends(get_db), current_user: 
     return JSONResponse({"experiences": result})
 
 
+@router.post("/{cid}/soft-delete")
+def soft_delete_competence(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    """Soft-delete : marque toutes les traductions du GID comme supprimées."""
+    source = db.query(Competence).filter(
+        Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Competence).filter(
+            Competence.gid == source.gid, Competence.user_id == current_user.id
+        ).update({"deleted_at": _dt.datetime.utcnow()})
+        db.commit()
+    return RedirectResponse(url="/competences/", status_code=303)
+
+
+@router.post("/{cid}/restore")
+def restore_competence(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    """Restaure une compétence depuis la corbeille."""
+    source = db.query(Competence).filter(
+        Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Competence).filter(
+            Competence.gid == source.gid, Competence.user_id == current_user.id
+        ).update({"deleted_at": None})
+        db.commit()
+    return RedirectResponse(url="/admin/trash", status_code=303)
+
+
 @router.post("/{cid}/delete")
 def delete_competence(cid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    """Suppression définitive (depuis la corbeille)."""
     source = db.query(Competence).filter(
         Competence.id == uuid.UUID(cid), Competence.user_id == current_user.id
     ).first()
@@ -184,19 +214,14 @@ def delete_competence(cid: str, db: Session = Depends(get_db), current_user: Use
         # Retirer le GID de toutes les expériences qui le référencent
         all_exps = db.query(Experience).filter(Experience.user_id == current_user.id).all()
         for exp in all_exps:
-            changed = False
             hard = [str(g) for g in (exp.hard_skills or [])]
             soft = [str(g) for g in (exp.soft_skills or [])]
             if gid_str in hard:
-                hard = [g for g in hard if g != gid_str]
-                exp.hard_skills = hard or None
-                changed = True
+                exp.hard_skills = [g for g in hard if g != gid_str] or None
             if gid_str in soft:
-                soft = [g for g in soft if g != gid_str]
-                exp.soft_skills = soft or None
-                changed = True
+                exp.soft_skills = [g for g in soft if g != gid_str] or None
         db.query(Competence).filter(
             Competence.gid == source.gid, Competence.user_id == current_user.id
         ).delete()
         db.commit()
-    return RedirectResponse(url="/competences/", status_code=303)
+    return RedirectResponse(url="/admin/trash", status_code=303)

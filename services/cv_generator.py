@@ -743,23 +743,26 @@ def _strip_mip_label(docx_path: str) -> None:
 
 def convert_docx_to_pdf(docx_path: str, pdf_path: str) -> None:
     """
-    Convertit un .docx en .pdf via WeasyPrint (HTML intermédiaire)
-    ou via LibreOffice si disponible.
-    Tente d'abord LibreOffice (meilleure fidélité), puis fallback WeasyPrint.
+    Convertit un .docx en .pdf.
+    Priorité : LibreOffice headless (meilleure fidélité) → mammoth + xhtml2pdf (pur Python).
     """
     import subprocess
-    import sys
 
-    # Tentative LibreOffice
-    for soffice in ["soffice", "libreoffice"]:
+    # 1. Tentative LibreOffice (prioritaire sur serveur Linux)
+    candidates = [
+        "soffice", "libreoffice",
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        "/usr/bin/soffice", "/usr/bin/libreoffice", "/usr/local/bin/soffice",
+    ]
+    for soffice in candidates:
         try:
             result = subprocess.run(
                 [soffice, "--headless", "--convert-to", "pdf", "--outdir",
                  str(Path(pdf_path).parent), docx_path],
-                capture_output=True, timeout=30,
+                capture_output=True, timeout=60,
             )
             if result.returncode == 0:
-                # LibreOffice génère le PDF avec le même nom de base
                 generated = Path(docx_path).with_suffix(".pdf")
                 if generated.exists() and str(generated) != pdf_path:
                     generated.rename(pdf_path)
@@ -767,11 +770,7 @@ def convert_docx_to_pdf(docx_path: str, pdf_path: str) -> None:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             continue
 
-    # Fallback : WeasyPrint via conversion HTML basique
-    try:
-        from docx2pdf import convert
-        convert(docx_path, pdf_path)
-    except Exception:
-        # Dernier recours : copie du docx avec extension .pdf (fichier inutilisable mais évite l'erreur)
-        import shutil
-        shutil.copy2(docx_path, pdf_path)
+    raise RuntimeError(
+        "Export PDF non disponible : LibreOffice n'est pas installé. "
+        "Sur Linux : sudo apt install libreoffice"
+    )

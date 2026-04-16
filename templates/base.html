@@ -175,15 +175,10 @@
       <span class="sidebar-label">Exporter CV</span>
     </a>
     {% if request.state.is_admin %}
-    <a href="/templates/"
-       class="sidebar-link {% if '/templates' in request.url.path %}active{% endif %}">
-      <i class="bi bi-layout-text-window sidebar-icon"></i>
-      <span class="sidebar-label">Templates</span>
-    </a>
-    <a href="/admin/users"
-       class="sidebar-link {% if '/admin/users' in request.url.path %}active{% endif %}">
-      <i class="bi bi-people sidebar-icon"></i>
-      <span class="sidebar-label">Utilisateurs</span>
+    <a href="/admin/"
+       class="sidebar-link {% if '/admin' in request.url.path or '/templates' in request.url.path %}active{% endif %}">
+      <i class="bi bi-shield-lock sidebar-icon"></i>
+      <span class="sidebar-label">Administration</span>
     </a>
     {% endif %}
   </nav>
@@ -196,9 +191,7 @@
       <i class="bi bi-person-circle sidebar-icon"></i>
       <span class="sidebar-label">{{ current_user.prenom }} {{ current_user.nom }}</span>
     </a>
-    <a href="/admin/trash" class="sidebar-link {% if '/admin' in request.url.path %}active{% endif %}">
-      <i class="bi bi-trash sidebar-icon"></i>
-      <span class="sidebar-label">Corbeille</span>
+    <a href="#" class="sidebar-link" style="display:none">{# Corbeille déplacée dans Admin #}
     </a>
 
     <!-- Toggle thème -->

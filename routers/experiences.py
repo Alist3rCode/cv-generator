@@ -60,7 +60,7 @@ def _load_comps_for_user(db: Session, user_id, prefer_lang_code="fr"):
     Préfère le français (ou la première langue disponible).
     Retourne (comps_hard, comps_soft) — listes de dicts {gid, nom, niveau}.
     """
-    all_comps = db.query(Competence).filter(Competence.user_id == user_id).all()
+    all_comps = db.query(Competence).filter(Competence.user_id == user_id, Competence.deleted_at == None).all()
 
     # Grouper par GID
     by_gid: dict = {}

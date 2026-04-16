@@ -1,10 +1,10 @@
-{% extends "base.html" %}
-{% block title %}Templates Word — CV Generator{% endblock %}
+{% extends "admin/layout.html" %}
+{% block title %}Templates Word — Administration{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h3><i class="bi bi-layout-text-window"></i> Templates Word</h3>
-  <a href="/templates/upload" class="btn btn-success"><i class="bi bi-upload"></i> Importer un template</a>
+  <h4><i class="bi bi-layout-text-window"></i> Templates Word</h4>
+  <a href="/templates/upload" class="btn btn-success btn-sm"><i class="bi bi-upload"></i> Importer un template</a>
 </div>
 
 {% if not admin_orgs %}

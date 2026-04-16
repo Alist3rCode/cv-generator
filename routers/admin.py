@@ -1,21 +1,26 @@
 """
-routers/admin.py — Pages d'administration (corbeille, gestion utilisateurs)
+routers/admin.py — Pages d'administration (corbeille, utilisateurs, organisations)
 """
 
 import uuid
-from fastapi import APIRouter, Depends, Request, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Depends, Form, Request, Query
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from database import get_db
-from models import User, Experience, Formation, Certification, UserOrganisation, RoleEnum
+from models import (
+    User, Experience, Formation, Certification, Competence,
+    Organisation, UserOrganisation, RoleEnum,
+)
 from routers.auth import require_user
 
 router = APIRouter(tags=["admin"])
 templates = Jinja2Templates(directory="templates")
 
+
+# ── helpers ────────────────────────────────────────────────────────────────
 
 def _dedup(items):
     seen, result = set(), []
@@ -27,15 +32,48 @@ def _dedup(items):
 
 
 def _is_site_admin(user: User, db: Session) -> bool:
-    """Un utilisateur est 'admin' s'il est admin d'au moins une organisation."""
     return db.query(UserOrganisation).filter(
         UserOrganisation.user_id == user.id,
         UserOrganisation.role == RoleEnum.admin,
     ).first() is not None
 
 
+def _require_admin(current_user: User, db: Session):
+    """Retourne RedirectResponse si non admin, None sinon."""
+    if not _is_site_admin(current_user, db):
+        return RedirectResponse(url="/dashboard", status_code=303)
+    return None
+
+
+def _trash_count(user_id, db: Session) -> int:
+    counts = [
+        db.query(Experience).filter(Experience.user_id == user_id, Experience.deleted_at != None).count(),
+        db.query(Formation).filter(Formation.user_id == user_id, Formation.deleted_at != None).count(),
+        db.query(Certification).filter(Certification.user_id == user_id, Certification.deleted_at != None).count(),
+        db.query(Competence).filter(Competence.user_id == user_id, Competence.deleted_at != None).count(),
+    ]
+    return sum(counts)
+
+
 PAGE_SIZE = 20
 
+
+# ── index ──────────────────────────────────────────────────────────────────
+
+@router.get("/admin/", response_class=HTMLResponse)
+@router.get("/admin", response_class=HTMLResponse)
+def admin_index(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+    return RedirectResponse(url="/admin/organisations", status_code=303)
+
+
+# ── utilisateurs ───────────────────────────────────────────────────────────
 
 @router.get("/admin/users", response_class=HTMLResponse)
 def admin_users(
@@ -45,9 +83,9 @@ def admin_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
-    if not _is_site_admin(current_user, db):
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url="/dashboard", status_code=303)
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
 
     query = db.query(User)
     if q.strip():
@@ -56,11 +94,10 @@ def admin_users(
             or_(User.nom.ilike(term), User.prenom.ilike(term), User.email.ilike(term))
         )
 
-    total  = query.count()
-    users  = query.order_by(User.nom, User.prenom).offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE).all()
-    pages  = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    total = query.count()
+    users = query.order_by(User.nom, User.prenom).offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE).all()
+    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
 
-    # Pour chaque user, récupérer s'il est admin d'au moins une org
     user_org_map = {}
     for uo in db.query(UserOrganisation).filter(
         UserOrganisation.user_id.in_([u.id for u in users])
@@ -76,6 +113,7 @@ def admin_users(
         "page":         page,
         "pages":        pages,
         "total":        total,
+        "trash_count":  _trash_count(current_user.id, db),
     })
 
 
@@ -90,14 +128,11 @@ def toggle_admin(
         return JSONResponse({"error": "Forbidden"}, status_code=403)
 
     uid = uuid.UUID(user_id)
-    # On agit sur toutes les UserOrganisation de cet utilisateur
     uo_list = db.query(UserOrganisation).filter(UserOrganisation.user_id == uid).all()
 
     if not uo_list:
         return JSONResponse({"error": "Aucune organisation pour cet utilisateur"}, status_code=404)
 
-    # Si au moins un rôle est admin → retirer tous les droits admin
-    # Sinon → passer tous en admin
     is_currently_admin = any(uo.role == RoleEnum.admin for uo in uo_list)
     new_role = RoleEnum.user if is_currently_admin else RoleEnum.admin
 
@@ -108,8 +143,18 @@ def toggle_admin(
     return JSONResponse({"is_admin": new_role == RoleEnum.admin})
 
 
+# ── corbeille ──────────────────────────────────────────────────────────────
+
 @router.get("/admin/trash", response_class=HTMLResponse)
-def admin_trash(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def admin_trash(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
     experiences = _dedup(db.query(Experience).filter(
         Experience.user_id == current_user.id, Experience.deleted_at != None
     ).order_by(Experience.deleted_at.desc()).all())
@@ -122,10 +167,236 @@ def admin_trash(request: Request, db: Session = Depends(get_db), current_user: U
         Certification.user_id == current_user.id, Certification.deleted_at != None
     ).order_by(Certification.deleted_at.desc()).all())
 
+    competences = _dedup(db.query(Competence).filter(
+        Competence.user_id == current_user.id, Competence.deleted_at != None
+    ).order_by(Competence.deleted_at.desc()).all())
+
+    tc = len(experiences) + len(formations) + len(certifications) + len(competences)
+
     return templates.TemplateResponse("admin/trash.html", {
-        "request": request,
-        "current_user": current_user,
-        "experiences": experiences,
-        "formations": formations,
+        "request":       request,
+        "current_user":  current_user,
+        "experiences":   experiences,
+        "formations":    formations,
         "certifications": certifications,
+        "competences":   competences,
+        "trash_count":   tc,
     })
+
+
+# ── organisations ──────────────────────────────────────────────────────────
+
+@router.get("/admin/organisations", response_class=HTMLResponse)
+def admin_organisations(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    orgs = db.query(Organisation).order_by(Organisation.nom).all()
+    # Count members per org
+    member_counts = {}
+    for uo in db.query(UserOrganisation).all():
+        oid = str(uo.organisation_id)
+        member_counts[oid] = member_counts.get(oid, 0) + 1
+
+    return templates.TemplateResponse("admin/organisations.html", {
+        "request":       request,
+        "current_user":  current_user,
+        "orgs":          orgs,
+        "member_counts": member_counts,
+        "trash_count":   _trash_count(current_user.id, db),
+    })
+
+
+@router.get("/admin/organisations/new", response_class=HTMLResponse)
+def admin_org_new(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    return templates.TemplateResponse("admin/organisation_form.html", {
+        "request":      request,
+        "current_user": current_user,
+        "org":          None,
+        "trash_count":  _trash_count(current_user.id, db),
+    })
+
+
+@router.post("/admin/organisations/new")
+def admin_org_create(
+    request: Request,
+    nom: str = Form(...),
+    adresse: str = Form(default=""),
+    email: str = Form(default=""),
+    telephone: str = Form(default=""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    org = Organisation(
+        nom=nom.strip(),
+        adresse=adresse.strip() or None,
+        email=email.strip() or None,
+        telephone=telephone.strip() or None,
+    )
+    db.add(org)
+    db.commit()
+    return RedirectResponse(url="/admin/organisations", status_code=303)
+
+
+@router.get("/admin/organisations/{org_id}/edit", response_class=HTMLResponse)
+def admin_org_edit(
+    org_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    org = db.query(Organisation).filter(Organisation.id == uuid.UUID(org_id)).first()
+    if not org:
+        return RedirectResponse(url="/admin/organisations", status_code=303)
+
+    # Members with their roles
+    members = (
+        db.query(UserOrganisation, User)
+        .join(User, User.id == UserOrganisation.user_id)
+        .filter(UserOrganisation.organisation_id == org.id)
+        .order_by(User.nom, User.prenom)
+        .all()
+    )
+    # All users not yet in this org
+    member_ids = [uo.user_id for uo, _ in members]
+    other_users = db.query(User).filter(User.id.notin_(member_ids)).order_by(User.nom, User.prenom).all()
+
+    return templates.TemplateResponse("admin/organisation_form.html", {
+        "request":      request,
+        "current_user": current_user,
+        "org":          org,
+        "members":      members,
+        "other_users":  other_users,
+        "trash_count":  _trash_count(current_user.id, db),
+    })
+
+
+@router.post("/admin/organisations/{org_id}/edit")
+def admin_org_update(
+    org_id: str,
+    nom: str = Form(...),
+    adresse: str = Form(default=""),
+    email: str = Form(default=""),
+    telephone: str = Form(default=""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    org = db.query(Organisation).filter(Organisation.id == uuid.UUID(org_id)).first()
+    if org:
+        org.nom = nom.strip()
+        org.adresse = adresse.strip() or None
+        org.email = email.strip() or None
+        org.telephone = telephone.strip() or None
+        db.commit()
+    return RedirectResponse(url="/admin/organisations", status_code=303)
+
+
+@router.post("/admin/organisations/{org_id}/delete")
+def admin_org_delete(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    org = db.query(Organisation).filter(Organisation.id == uuid.UUID(org_id)).first()
+    if org:
+        db.query(UserOrganisation).filter(UserOrganisation.organisation_id == org.id).delete()
+        db.delete(org)
+        db.commit()
+    return RedirectResponse(url="/admin/organisations", status_code=303)
+
+
+# ── membres d'une organisation ─────────────────────────────────────────────
+
+@router.post("/admin/organisations/{org_id}/add-member")
+def admin_org_add_member(
+    org_id: str,
+    user_id: str = Form(...),
+    role: str = Form(default="user"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    oid = uuid.UUID(org_id)
+    uid = uuid.UUID(user_id)
+    existing = db.query(UserOrganisation).filter(
+        UserOrganisation.organisation_id == oid,
+        UserOrganisation.user_id == uid,
+    ).first()
+    if not existing:
+        uo = UserOrganisation(
+            organisation_id=oid,
+            user_id=uid,
+            role=RoleEnum.admin if role == "admin" else RoleEnum.user,
+        )
+        db.add(uo)
+        db.commit()
+    return RedirectResponse(url=f"/admin/organisations/{org_id}/edit", status_code=303)
+
+
+@router.post("/admin/organisations/{org_id}/remove-member/{uo_id}")
+def admin_org_remove_member(
+    org_id: str,
+    uo_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    uo = db.query(UserOrganisation).filter(UserOrganisation.id == uuid.UUID(uo_id)).first()
+    if uo:
+        db.delete(uo)
+        db.commit()
+    return RedirectResponse(url=f"/admin/organisations/{org_id}/edit", status_code=303)
+
+
+@router.post("/admin/organisations/{org_id}/set-role/{uo_id}")
+def admin_org_set_role(
+    org_id: str,
+    uo_id: str,
+    role: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    uo = db.query(UserOrganisation).filter(UserOrganisation.id == uuid.UUID(uo_id)).first()
+    if uo:
+        uo.role = RoleEnum.admin if role == "admin" else RoleEnum.user
+        db.commit()
+    return RedirectResponse(url=f"/admin/organisations/{org_id}/edit", status_code=303)

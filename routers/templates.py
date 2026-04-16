@@ -33,8 +33,18 @@ def _get_user_orgs_as_admin(user: User, db: Session):
     )
 
 
+def _require_admin(user: User, db: Session):
+    orgs = _get_user_orgs_as_admin(user, db)
+    if not orgs:
+        return RedirectResponse(url="/dashboard", status_code=303)
+    return None
+
+
 @router.get("/", response_class=HTMLResponse)
 def list_templates(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
     admin_orgs = _get_user_orgs_as_admin(current_user, db)
     admin_org_ids = [o.id for o in admin_orgs]
     tmplts = (
@@ -43,16 +53,29 @@ def list_templates(request: Request, db: Session = Depends(get_db), current_user
         .order_by(Template.is_active.desc())
         .all()
     ) if admin_org_ids else []
+    from models import Experience, Formation, Certification, Competence
+    def _tc():
+        uid = current_user.id
+        return sum([
+            db.query(Experience).filter(Experience.user_id == uid, Experience.deleted_at != None).count(),
+            db.query(Formation).filter(Formation.user_id == uid, Formation.deleted_at != None).count(),
+            db.query(Certification).filter(Certification.user_id == uid, Certification.deleted_at != None).count(),
+            db.query(Competence).filter(Competence.user_id == uid, Competence.deleted_at != None).count(),
+        ])
     return templates_jinja.TemplateResponse("admin/templates_list.html", {
         "request": request,
         "current_user": current_user,
         "templates": tmplts,
         "admin_orgs": admin_orgs,
+        "trash_count": _tc(),
     })
 
 
 @router.get("/upload", response_class=HTMLResponse)
 def upload_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
     admin_orgs = _get_user_orgs_as_admin(current_user, db)
     from datetime import date
     return templates_jinja.TemplateResponse("admin/template_upload.html", {
@@ -60,6 +83,7 @@ def upload_page(request: Request, db: Session = Depends(get_db), current_user: U
         "current_user": current_user,
         "admin_orgs": admin_orgs,
         "now": date.today(),
+        "trash_count": 0,
     })
 
 
@@ -72,6 +96,9 @@ async def upload_template(
     db: Session           = Depends(get_db),
     current_user: User    = Depends(require_user),
 ):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
     # Vérification que le fichier est bien un .docx
     if not fichier.filename.endswith(".docx"):
         admin_orgs = _get_user_orgs_as_admin(current_user, db)
@@ -104,6 +131,9 @@ async def upload_template(
 
 @router.post("/{tid}/toggle")
 def toggle_template(tid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
     t = db.query(Template).filter(Template.id == uuid.UUID(tid)).first()
     if t:
         t.is_active = not t.is_active
@@ -113,6 +143,9 @@ def toggle_template(tid: str, db: Session = Depends(get_db), current_user: User 
 
 @router.post("/{tid}/delete")
 def delete_template(tid: str, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
     from models import CVExport
     t = db.query(Template).filter(Template.id == uuid.UUID(tid)).first()
     if t:

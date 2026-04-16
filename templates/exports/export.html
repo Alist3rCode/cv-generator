@@ -1,6 +1,43 @@
 {% extends "base.html" %}
 {% block title %}Exporter mon CV — CV Generator{% endblock %}
 
+{% block head_extra %}
+<style>
+/* ── Sélecteur de langue ─────────────────────────────── */
+.lang-picker { display:flex; flex-wrap:wrap; gap:10px; }
+.lang-flag-btn {
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:8px 12px; border:2px solid transparent; border-radius:10px;
+  background:none; cursor:pointer; transition:all .18s; opacity:1;
+}
+.lang-flag-btn img { width:36px; height:26px; object-fit:cover; border-radius:3px; }
+.lang-flag-btn span { font-size:.72rem; font-weight:500; white-space:nowrap; }
+.lang-flag-btn.disabled { opacity:.35; cursor:not-allowed; filter:grayscale(1); }
+.lang-flag-btn.selected {
+  border-color:#f59e0b;
+  box-shadow:0 0 0 3px rgba(245,158,11,.35);
+  background:rgba(245,158,11,.08);
+}
+[data-bs-theme=dark] .lang-flag-btn.selected {
+  border-color:#fbbf24;
+  box-shadow:0 0 0 3px rgba(251,191,36,.3);
+  background:rgba(251,191,36,.08);
+}
+
+/* ── Boutons export ──────────────────────────────────── */
+.export-btn {
+  display:flex; align-items:center; gap:10px; padding:11px 26px;
+  border:none; border-radius:10px; cursor:pointer;
+  font-size:1rem; font-weight:600; transition:all .18s;
+}
+.export-btn-word { background:#1565c0; color:#fff; }
+.export-btn-word:hover { background:#0d47a1; }
+.export-btn-pdf  { background:#c62828; color:#fff; }
+.export-btn-pdf:hover  { background:#b71c1c; }
+.export-btn:disabled { opacity:.65; cursor:not-allowed; }
+</style>
+{% endblock %}
+
 {% block content %}
 <h3 class="mb-4"><i class="bi bi-file-earmark-arrow-down"></i> Exporter mon CV</h3>
 
@@ -14,42 +51,54 @@
 
 <div class="card shadow-sm mb-5">
   <div class="card-body">
-    <form method="post" action="/exports/generate">
+    <form method="post" action="/exports/generate" id="exportForm">
+      <input type="hidden" name="format" id="selectedFormat" value="docx" />
+      <input type="hidden" name="language_id" id="selectedLangId" value="{{ default_lang_id }}" />
 
-      <div class="row g-3 mb-3">
-        <div class="col-md-4">
-          <label class="form-label">Template <span class="text-danger">*</span></label>
+      <!-- Ligne 1 : Template + Langue -->
+      <div class="row g-3 align-items-end mb-4">
+        <div class="col-md-5">
+          <label class="form-label fw-semibold">Template <span class="text-danger">*</span></label>
           <select name="template_id" class="form-select" required id="templateSelect">
             {% for t in active_templates %}
             <option value="{{ t.id }}" data-nom="{{ t.nom }}">{{ t.nom }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-4">
-          <label class="form-label">Langue <span class="text-danger">*</span></label>
-          <select name="language_id" class="form-select" required>
+        <div class="col">
+          <label class="form-label fw-semibold">Langue</label>
+          <div class="lang-picker" id="langPicker">
             {% for lang in languages %}
-            <option value="{{ lang.id }}">{{ lang.nom }}</option>
+            {% set has_data = lang.id | string in langs_with_data %}
+            <button type="button"
+                    class="lang-flag-btn {% if not has_data %}disabled{% endif %}"
+                    data-lang-id="{{ lang.id }}"
+                    title="{% if not has_data %}Aucune donnée disponible en {{ lang.nom }}{% else %}{{ lang.nom }}{% endif %}"
+                    {% if not has_data %}disabled{% endif %}>
+              <img src="https://flagcdn.com/{{ lang.code }}.svg" alt="{{ lang.nom }}" />
+              <span>{{ lang.nom }}</span>
+            </button>
             {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Format <span class="text-danger">*</span></label>
-          <select name="format" class="form-select" required>
-            <option value="docx">Word (.docx)</option>
-            <option value="pdf">PDF (.pdf)</option>
-          </select>
+          </div>
         </div>
       </div>
 
+      <!-- Ligne 2 : Nom du fichier -->
       <div class="mb-4">
         <label class="form-label">Nom du fichier <span class="text-muted small fw-normal">(facultatif)</span></label>
         <input type="text" name="nom" id="nomExport" class="form-control" />
       </div>
 
-      <button type="submit" class="btn btn-primary" id="generateBtn">
-        <i class="bi bi-download"></i> Générer et télécharger
-      </button>
+      <!-- Ligne 3 : Boutons export -->
+      <div class="d-flex gap-3 flex-wrap">
+        <button type="submit" class="export-btn export-btn-word" id="btnWord" data-format="docx">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.5 18l-1.5-6h1.2l1 4.3 1.1-4.3h1.1l1.1 4.3 1-4.3H14l-1.5 6h-1.1l-1.1-4.3-1.1 4.3H8.5z"/>
+          </svg>
+          Export Word
+        </button>
+        {# Export PDF désactivé — requiert LibreOffice (voir README) #}
+      </div>
     </form>
   </div>
 </div>
@@ -58,11 +107,9 @@
 {% if previous_exports %}
 <div class="d-flex justify-content-between align-items-center mb-3 mt-5">
   <h5 class="mb-0">Exports récents</h5>
-  <form method="post" action="/exports/delete-all" onsubmit="return confirm('Supprimer tous les exports ?')">
-    <button type="submit" class="btn btn-sm btn-outline-danger">
-      <i class="bi bi-trash"></i> Tout supprimer
-    </button>
-  </form>
+  <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDeleteAll()">
+    <i class="bi bi-trash"></i> Tout supprimer
+  </button>
 </div>
 <div class="card shadow-sm" id="exportsHistoryCard">
   <div class="table-responsive">
@@ -71,6 +118,7 @@
         <tr>
           <th>Nom</th>
           <th>Date</th>
+          <th>Langue</th>
           <th>Format</th>
           <th>Actions</th>
         </tr>
@@ -80,7 +128,20 @@
         <tr>
           <td class="fw-semibold">{{ e.nom or '—' }}</td>
           <td class="text-muted small">{{ e.generated_at.strftime('%d/%m/%Y %H:%M') if e.generated_at else '—' }}</td>
-          <td><span class="badge bg-secondary">{{ e.format.value.upper() }}</span></td>
+          <td>
+            {% if e.language %}
+            <img src="https://flagcdn.com/{{ e.language.code }}.svg"
+                 alt="{{ e.language.nom }}" title="{{ e.language.nom }}"
+                 width="28" height="20" style="border-radius:3px;object-fit:cover;" />
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if e.format.value == 'pdf' %}
+            <span class="badge bg-danger">PDF</span>
+            {% else %}
+            <span class="badge" style="background:#1565c0;">DOCX</span>
+            {% endif %}
+          </td>
           <td>
             <div class="d-flex gap-2">
               {% if e.fichier_path %}
@@ -103,14 +164,47 @@
     </table>
   </div>
   <div class="card-footer d-flex justify-content-end py-2">
-    <form method="post" action="/exports/delete-all" onsubmit="return confirm('Supprimer tous les exports ?')">
-      <button type="submit" class="btn btn-sm btn-outline-danger">
-        <i class="bi bi-trash"></i> Tout supprimer
-      </button>
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDeleteAll()">
+      <i class="bi bi-trash"></i> Tout supprimer
+    </button>
     </form>
   </div>
 </div>
 {% endif %}
+
+<!-- Modale — Tout supprimer -->
+<div class="modal fade" id="deleteAllModal" tabindex="-1" aria-labelledby="deleteAllModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-danger">
+        <h5 class="modal-title text-danger" id="deleteAllModalLabel">
+          <i class="bi bi-exclamation-triangle-fill"></i> Supprimer tous les exports
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Vous êtes sur le point de supprimer <strong>l'intégralité de votre historique d'exports</strong>.</p>
+        <div class="alert alert-danger d-flex gap-2 align-items-start mb-0">
+          <i class="bi bi-slash-circle-fill flex-shrink-0 mt-1"></i>
+          <div>
+            <strong>Cette action est irrémédiable.</strong><br>
+            Tous les fichiers générés seront définitivement supprimés et ne pourront pas être récupérés.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> Annuler
+        </button>
+        <form method="post" action="/exports/delete-all">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash"></i> Tout supprimer définitivement
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modale de confirmation de suppression -->
 <div class="modal fade" id="deleteExportModal" tabindex="-1" aria-labelledby="deleteExportModalLabel" aria-hidden="true">
@@ -129,7 +223,6 @@
           <div>
             <strong>Cette action est irrémédiable.</strong><br>
             Le fichier sera définitivement supprimé et ne pourra pas être récupéré.
-            Il vous faudra générer un nouvel export si vous en avez besoin.
           </div>
         </div>
       </div>
@@ -148,67 +241,104 @@
 </div>
 
 <script>
-// ── Soumission du formulaire de génération via fetch ───────────────────────
 (function() {
-  var form = document.querySelector('form[action="/exports/generate"]');
-  var btn  = document.getElementById('generateBtn');
+  // ── Sélecteur de langue ──────────────────────────────────────────────
+  var defaultLangId = '{{ default_lang_id }}';
+  var langIdInput   = document.getElementById('selectedLangId');
+  var langBtns      = document.querySelectorAll('.lang-flag-btn:not(.disabled)');
+
+  function selectLang(id) {
+    langIdInput.value = id;
+    langBtns.forEach(function(btn) {
+      btn.classList.toggle('selected', btn.dataset.langId === id);
+    });
+  }
+
+  langBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() { selectLang(btn.dataset.langId); });
+  });
+
+  selectLang(defaultLangId);
+
+  // ── Bouton export Word ───────────────────────────────────────────────
+  var formatInput = document.getElementById('selectedFormat');
+  var btnWord     = document.getElementById('btnWord');
+  var exportBtns  = [btnWord];
+
+  // ── Soumission via fetch ──────────────────────────────────────────────
+  var form = document.getElementById('exportForm');
   if (!form) return;
 
   form.addEventListener('submit', function(e) {
     e.preventDefault();
 
-    // État chargement
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération en cours…';
+    // Désactiver les deux boutons + spinner
+    exportBtns.forEach(function(b) { b.disabled = true; });
+    var clickedFormat = formatInput.value;
+    if (clickedFormat === 'pdf') {
+      btnPdf.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération…';
+    } else {
+      btnWord.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération…';
+    }
 
     fetch('/exports/generate', {
       method: 'POST',
       headers: { 'X-Requested-With': 'fetch' },
       body: new FormData(form),
     })
-    .then(function(r) {
-      if (!r.ok) throw new Error('Erreur serveur');
-      return r.json();
-    })
-    .then(function(data) {
-      // Déclencher le téléchargement via un lien temporaire
+    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+    .then(function(res) {
+      if (!res.ok) {
+        var msg = res.data.error || 'Erreur serveur';
+        // Afficher l'erreur sous le formulaire
+        var errEl = document.getElementById('exportError');
+        if (!errEl) {
+          errEl = document.createElement('div');
+          errEl.id = 'exportError';
+          errEl.className = 'alert alert-danger mt-3';
+          document.getElementById('exportForm').insertAdjacentElement('afterend', errEl);
+        }
+        errEl.textContent = msg;
+        errEl.style.display = '';
+        return;
+      }
+      var data = res.data;
+      var errEl = document.getElementById('exportError');
+      if (errEl) errEl.style.display = 'none';
       var a = document.createElement('a');
       a.href = data.download_url;
       a.download = '';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      // Injecter la nouvelle ligne dans l'historique
       _prependExportRow(data);
     })
     .catch(function() {
-      alert('Une erreur est survenue lors de la génération.');
+      alert('Une erreur réseau est survenue lors de la génération.');
     })
     .finally(function() {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="bi bi-download"></i> Générer et télécharger';
+      exportBtns.forEach(function(b) { b.disabled = false; });
+      btnWord.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.5 18l-1.5-6h1.2l1 4.3 1.1-4.3h1.1l1.1 4.3 1-4.3H14l-1.5 6h-1.1l-1.1-4.3-1.1 4.3H8.5z"/></svg> Export Word';
     });
   });
 
   function _prependExportRow(data) {
-    // Créer le tableau s'il n'existe pas encore
     var section = document.getElementById('exportsHistory');
     if (!section) {
-      // Construire la section entière
       var wrapper = document.createElement('div');
       wrapper.innerHTML = [
-        '<h5 class="mb-3 mt-5">Exports récents</h5>',
+        '<div class="d-flex justify-content-between align-items-center mb-3 mt-5">',
+        '  <h5 class="mb-0">Exports récents</h5>',
+        '</div>',
         '<div class="card shadow-sm" id="exportsHistoryCard">',
         '  <div class="table-responsive">',
         '    <table class="table table-hover align-middle mb-0" id="exportsHistory">',
-        '      <thead><tr><th>Nom</th><th>Date</th><th>Format</th><th>Actions</th></tr></thead>',
+        '      <thead><tr><th>Nom</th><th>Date</th><th>Langue</th><th>Format</th><th>Actions</th></tr></thead>',
         '      <tbody id="exportsHistoryBody"></tbody>',
         '    </table>',
         '  </div>',
         '</div>',
       ].join('');
-      // Insérer après le formulaire card
       var formCard = document.querySelector('.card.shadow-sm.mb-5');
       if (formCard && formCard.parentNode) {
         formCard.parentNode.insertBefore(wrapper, formCard.nextSibling);
@@ -222,7 +352,11 @@
 
     var badge = data.format === 'pdf'
       ? '<span class="badge bg-danger">PDF</span>'
-      : '<span class="badge bg-secondary">DOCX</span>';
+      : '<span class="badge" style="background:#1565c0;">DOCX</span>';
+
+    var flagHtml = data.lang_code
+      ? '<img src="https://flagcdn.com/' + data.lang_code + '.svg" alt="' + (data.lang_nom || '') + '" title="' + (data.lang_nom || '') + '" width="28" height="20" style="border-radius:3px;object-fit:cover;" />'
+      : '—';
 
     var safeName = data.nom.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
 
@@ -230,6 +364,7 @@
     tr.innerHTML = [
       '<td class="fw-semibold">' + safeName + '</td>',
       '<td class="text-muted small">' + data.generated_at + '</td>',
+      '<td>' + flagHtml + '</td>',
       '<td>' + badge + '</td>',
       '<td>',
       '  <div class="d-flex gap-2">',
@@ -246,38 +381,43 @@
 
     tbody.insertBefore(tr, tbody.firstChild);
   }
+
+  // ── Auto-placeholder nom de fichier ─────────────────────────────────
+  var templateSelect = document.getElementById('templateSelect');
+  var nomInput       = document.getElementById('nomExport');
+  if (templateSelect && nomInput) {
+    function updateHint() {
+      var opt  = templateSelect.options[templateSelect.selectedIndex];
+      var nom  = opt ? opt.dataset.nom : '';
+      var now  = new Date();
+      var dd   = String(now.getDate()).padStart(2, '0');
+      var mm   = String(now.getMonth() + 1).padStart(2, '0');
+      var yyyy = now.getFullYear();
+      var hh   = String(now.getHours()).padStart(2, '0');
+      var min  = String(now.getMinutes()).padStart(2, '0');
+      nomInput.placeholder = nom + ' - ' + dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
+    }
+    templateSelect.addEventListener('change', updateHint);
+    updateHint();
+  }
 })();
 
-var _deleteExportModal = null;
+var _deleteAllModal = null;
+function confirmDeleteAll() {
+  if (!_deleteAllModal) {
+    _deleteAllModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteAllModal'));
+  }
+  _deleteAllModal.show();
+}
 
+var _deleteExportModal = null;
 function confirmDeleteExport(exportId, nom) {
   document.getElementById('deleteExportName').textContent = nom || 'cet export';
   document.getElementById('deleteExportForm').action = '/exports/' + exportId + '/delete';
   if (!_deleteExportModal) {
-    _deleteExportModal = new bootstrap.Modal(document.getElementById('deleteExportModal'));
+    _deleteExportModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteExportModal'));
   }
   _deleteExportModal.show();
 }
-
-(function() {
-  var templateSelect = document.getElementById('templateSelect');
-  var nomInput       = document.getElementById('nomExport');
-  if (!templateSelect || !nomInput) return;
-
-  function updateHint() {
-    var opt  = templateSelect.options[templateSelect.selectedIndex];
-    var nom  = opt ? opt.dataset.nom : '';
-    var now  = new Date();
-    var dd   = String(now.getDate()).padStart(2, '0');
-    var mm   = String(now.getMonth() + 1).padStart(2, '0');
-    var yyyy = now.getFullYear();
-    var hh   = String(now.getHours()).padStart(2, '0');
-    var min  = String(now.getMinutes()).padStart(2, '0');
-    nomInput.placeholder = nom + ' - ' + dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
-  }
-
-  templateSelect.addEventListener('change', updateHint);
-  updateHint();
-})();
 </script>
 {% endblock %}

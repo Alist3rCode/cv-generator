@@ -1,13 +1,12 @@
-{% extends "base.html" %}
-{% block title %}Corbeille{% endblock %}
+{% extends "admin/layout.html" %}
+{% block title %}Corbeille — Administration{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h3><i class="bi bi-trash"></i> Corbeille</h3>
-  <a href="/dashboard" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Retour</a>
+  <h4><i class="bi bi-trash"></i> Corbeille</h4>
 </div>
 
-{% set total = experiences|length + formations|length + certifications|length %}
+{% set total = experiences|length + formations|length + certifications|length + competences|length %}
 {% if total == 0 %}
   <p class="text-muted">La corbeille est vide.</p>
 {% else %}
@@ -71,6 +70,28 @@
         </small>
       </div>
       <form method="post" action="/certifications/{{ cert.id }}/restore" class="ms-3 flex-shrink-0">
+        <button type="submit" class="btn btn-sm btn-outline-success">
+          <i class="bi bi-arrow-counterclockwise"></i> Restaurer
+        </button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if competences %}
+  <h6 class="text-muted mb-2">Compétences</h6>
+  <ul class="list-group mb-4">
+    {% for comp in competences %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div>
+        <strong>{{ comp.nom }}</strong>
+        <span class="badge bg-secondary ms-1">{{ comp.type.value }}</span>
+        <small class="text-muted d-block">
+          Supprimé le {{ comp.deleted_at.strftime('%d/%m/%Y') }}
+        </small>
+      </div>
+      <form method="post" action="/competences/{{ comp.id }}/restore" class="ms-3 flex-shrink-0">
         <button type="submit" class="btn btn-sm btn-outline-success">
           <i class="bi bi-arrow-counterclockwise"></i> Restaurer
         </button>
