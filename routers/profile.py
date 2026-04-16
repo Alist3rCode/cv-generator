@@ -19,12 +19,13 @@ templates = Jinja2Templates(directory="templates")
 
 
 def compute_completion(user_id, db: Session) -> tuple[int, dict]:
-    """Calcule le % de complétion du profil (4 critères = 25% chacun)."""
+    """Calcule le % de complétion du profil (5 critères = 20% chacun)."""
     criteria = {
         "bio":        db.query(Bio).filter(Bio.user_id == user_id).count() > 0,
         "experience": db.query(Experience).filter(Experience.user_id == user_id).count() > 0,
         "formation":  db.query(Formation).filter(Formation.user_id == user_id).count() > 0,
         "competence": db.query(Competence).filter(Competence.user_id == user_id).count() > 0,
+        "langue":     db.query(ProfilLangue).filter(ProfilLangue.user_id == user_id).count() > 0,
     }
     completed = sum(1 for v in criteria.values() if v)
     return int(completed / len(criteria) * 100), criteria
