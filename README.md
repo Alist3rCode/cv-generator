@@ -1,6 +1,17 @@
 # CV Generator
 
-Application web de génération de CV, développée avec **FastAPI** et **SQLite**.
+Application web de génération de CV, développée avec **FastAPI** et **PostgreSQL**, déployable via Docker.
+
+## Installation rapide
+
+```bash
+git clone https://github.com/Alist3rCode/cv-generator.git
+cd cv-generator
+cp .env.example .env   # éditer les valeurs
+docker compose up -d
+```
+
+> Voir **[INSTALL.md](INSTALL.md)** pour le guide complet (configuration, backup, mise à jour, dépannage).
 
 ## Fonctionnalités
 
@@ -27,7 +38,7 @@ Application web de génération de CV, développée avec **FastAPI** et **SQLite
 |-----------|-------------|
 | Backend | [FastAPI](https://fastapi.tiangolo.com/) |
 | ORM | [SQLAlchemy 2.0](https://www.sqlalchemy.org/) |
-| Base de données | SQLite |
+| Base de données | PostgreSQL 16 |
 | Auth | JWT via `python-jose` + `passlib` |
 | Templates HTML | Jinja2 + Bootstrap 5.3 |
 | Éditeur riche | [Quill.js](https://quilljs.com/) (CDN) |
@@ -40,54 +51,24 @@ Application web de génération de CV, développée avec **FastAPI** et **SQLite
 
 ## Export PDF
 
-> ⚠️ **Non disponible actuellement** — le bouton Export PDF est masqué dans l'interface.
-
-L'export PDF repose sur **LibreOffice headless** pour convertir le `.docx` généré.
-Ce n'est pas encore câblé proprement (pas de Dockerfile, pas d'installation automatique).
-
-**Roadmap Docker** : l'objectif est de packager l'application dans un conteneur qui inclut LibreOffice, rendant l'export PDF clef en main sans aucune installation manuelle.
-
-En attendant, sur un serveur Linux :
-```bash
-sudo apt install libreoffice
-```
+L'export PDF utilise **LibreOffice headless** (inclus dans l'image Docker) pour convertir le `.docx` généré. Aucune installation supplémentaire n'est nécessaire avec Docker.
 
 ## Installation
 
-### Prérequis
+> Voir **[INSTALL.md](INSTALL.md)** pour le guide complet.
 
-- **Python 3.12** (requis — Python 3.14 non supporté par `pydantic-core`)
-- pip
-
-### Étapes
+### Résumé
 
 ```bash
-# 1. Cloner le dépôt
 git clone https://github.com/Alist3rCode/cv-generator.git
 cd cv-generator
-
-# 2. Installer les dépendances
-py -3.12 -m pip install -r requirements.txt
-
-# 3. (Optionnel) Créer un compte admin de démo
-py -3.12 seed.py
-
-# 4. Lancer l'application
-py -3.12 -m uvicorn main:app --reload --port 9000
+cp .env.example .env          # Éditer SECRET_KEY, POSTGRES_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD
+docker compose up -d          # Build + démarrage (première fois ~5 min)
 ```
 
-L'application est accessible sur **http://localhost:9000**
+L'application est accessible sur **http://\<IP-serveur\>:9000**
 
-> Les 5 langues par défaut (fr, gb, es, it, de) sont créées automatiquement au premier démarrage.
-
-### Compte admin de démo (après `seed.py`)
-
-| Champ | Valeur |
-|-------|--------|
-| Email | `admin@example.com` |
-| Mot de passe | `admin1234` |
-
-> **Important :** Changez ce mot de passe avant toute utilisation en production.
+Le compte admin, les tables et les langues par défaut sont créés automatiquement au premier démarrage.
 
 ## Structure du projet
 
@@ -95,7 +76,7 @@ L'application est accessible sur **http://localhost:9000**
 cv-generator/
 ├── main.py                  # Point d'entrée FastAPI + handlers d'erreur + filtres Jinja2
 ├── models.py                # Modèles SQLAlchemy (Language.sort_order, CEFRLevelEnum…)
-├── database.py              # Configuration SQLite
+├── database.py              # Configuration PostgreSQL (DATABASE_URL depuis env)
 ├── seed.py                  # Données initiales (admin + langues)
 ├── requirements.txt
 │
