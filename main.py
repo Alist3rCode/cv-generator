@@ -153,6 +153,7 @@ def on_startup():
     """Initialise la base de données au démarrage et s'assure que les langues par défaut existent."""
     init_db()
     _seed_default_languages()
+    _seed_default_admin()
 
 
 def _seed_default_languages():
@@ -179,6 +180,47 @@ def _seed_default_languages():
         for code, nom in default_langs:
             if not db.query(Language).filter(Language.code == code).first():
                 db.add(Language(id=_uuid.uuid4(), code=code, nom=nom))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _seed_default_admin():
+    """Crée l'organisation et le compte admin par défaut s'ils n'existent pas encore."""
+    import os as _os
+    import uuid as _uuid
+    from database import SessionLocal
+    from models import Organisation, User, UserOrganisation, RoleEnum
+    from routers.auth import hash_password
+
+    admin_email    = _os.getenv("ADMIN_EMAIL",    "admin@example.com")
+    admin_password = _os.getenv("ADMIN_PASSWORD", "admin1234")
+
+    db = SessionLocal()
+    try:
+        org = db.query(Organisation).filter(Organisation.nom == "Ma Société").first()
+        if not org:
+            org = Organisation(id=_uuid.uuid4(), nom="Ma Société")
+            db.add(org)
+            db.flush()
+
+        admin = db.query(User).filter(User.email == admin_email).first()
+        if not admin:
+            admin = User(
+                id=_uuid.uuid4(),
+                email=admin_email,
+                password_hash=hash_password(admin_password),
+                nom="Admin",
+                prenom="Super",
+            )
+            db.add(admin)
+            db.flush()
+            db.add(UserOrganisation(
+                id=_uuid.uuid4(),
+                user_id=admin.id,
+                organisation_id=org.id,
+                role=RoleEnum.admin,
+            ))
         db.commit()
     finally:
         db.close()

@@ -2,6 +2,7 @@
 routers/templates.py — Import et gestion des templates Word (admin)
 """
 
+import os
 import uuid
 import shutil
 from pathlib import Path
@@ -19,7 +20,7 @@ from routers.auth import require_user
 router = APIRouter(prefix="/templates", tags=["templates"])
 templates_jinja = Jinja2Templates(directory="templates")
 
-UPLOAD_DIR = Path("uploads/templates")
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads/templates"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

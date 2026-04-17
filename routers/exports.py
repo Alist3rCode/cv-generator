@@ -2,6 +2,7 @@
 routers/exports.py — Génération et téléchargement des CV
 """
 
+import os
 import uuid
 from pathlib import Path
 
@@ -22,7 +23,7 @@ from services.cv_generator import generate_cv_docx, convert_docx_to_pdf
 router = APIRouter(prefix="/exports", tags=["exports"])
 templates = Jinja2Templates(directory="templates")
 
-EXPORT_DIR = Path("exports")
+EXPORT_DIR = Path(os.getenv("EXPORT_DIR", "exports"))
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -135,7 +136,10 @@ def generate_export(
 
     if export_fmt == ExportFormatEnum.pdf:
         pdf_path = EXPORT_DIR / f"{export_id}.pdf"
-        convert_docx_to_pdf(str(docx_path), str(pdf_path))
+        try:
+            convert_docx_to_pdf(str(docx_path), str(pdf_path))
+        except RuntimeError as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
         final_path = str(pdf_path)
     else:
         final_path = str(docx_path)

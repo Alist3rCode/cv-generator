@@ -1,25 +1,21 @@
 """
-database.py — Configuration SQLite + session SQLAlchemy
+database.py — Configuration PostgreSQL + session SQLAlchemy
 CV Generator App
 """
 
-from sqlalchemy import create_engine, event
+import os
+
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# Base de données SQLite locale (fichier cv_generator.db créé automatiquement)
-DATABASE_URL = "sqlite:///./cv_generator.db"
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Nécessaire pour SQLite avec FastAPI
+# URL PostgreSQL — construite depuis POSTGRES_PASSWORD ou surchargée via DATABASE_URL
+_pw = os.getenv("POSTGRES_PASSWORD", "cvgen")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"postgresql+psycopg2://cvgen:{_pw}@db:5432/cvgen",
 )
 
-# Activer les clés étrangères sur SQLite (désactivées par défaut)
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

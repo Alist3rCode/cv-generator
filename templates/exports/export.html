@@ -122,7 +122,12 @@
           </svg>
           Export Word
         </button>
-        {# Export PDF désactivé — requiert LibreOffice (voir README) #}
+        <button type="submit" class="export-btn export-btn-pdf" id="btnPdf" data-format="pdf">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM11 17H9v-4h2v4zm4 0h-2v-4h2v4zm-2-6H9V9h4v2z"/>
+          </svg>
+          Export PDF
+        </button>
       </div>
     </form>
   </div>
@@ -290,10 +295,16 @@
 
   selectLang(defaultLangId);
 
-  // ── Bouton export Word ───────────────────────────────────────────────
+  // ── Boutons export ───────────────────────────────────────────────────
   var formatInput = document.getElementById('selectedFormat');
   var btnWord     = document.getElementById('btnWord');
-  var exportBtns  = [btnWord];
+  var btnPdf      = document.getElementById('btnPdf');
+  var exportBtns  = [btnWord, btnPdf];
+
+  // Chaque bouton fixe le format avant soumission
+  exportBtns.forEach(function(b) {
+    b.addEventListener('click', function() { formatInput.value = b.dataset.format; });
+  });
 
   // ── Soumission via fetch ──────────────────────────────────────────────
   var form = document.getElementById('exportForm');
@@ -349,6 +360,7 @@
     .finally(function() {
       exportBtns.forEach(function(b) { b.disabled = false; });
       btnWord.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.5 18l-1.5-6h1.2l1 4.3 1.1-4.3h1.1l1.1 4.3 1-4.3H14l-1.5 6h-1.1l-1.1-4.3-1.1 4.3H8.5z"/></svg> Export Word';
+      btnPdf.innerHTML  = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM11 17H9v-4h2v4zm4 0h-2v-4h2v4zm-2-6H9V9h4v2z"/></svg> Export PDF';
     });
   });
 

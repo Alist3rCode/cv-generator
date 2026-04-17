@@ -2,6 +2,7 @@
 routers/auth.py — Authentification (login / logout)
 """
 
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -18,7 +19,7 @@ from models import User, UserOrganisation
 router = APIRouter(tags=["auth"])
 templates = Jinja2Templates(directory="templates")
 
-SECRET_KEY = "changeme-secret-key-in-production"
+SECRET_KEY = os.getenv("SECRET_KEY", "changeme-secret-key-in-production")
 ALGORITHM  = "HS256"
 TOKEN_EXPIRE_MINUTES = 60 * 8  # 8 heures
 
