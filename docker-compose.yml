@@ -15,7 +15,8 @@ services:
       retries: 10
 
   app:
-    build: .
+    image: ghcr.io/alist3rcode/cv-generator:latest
+    build: .   # ignoré si l'image existe déjà ; utilisez --build pour forcer un build local
     ports:
       - "9000:9000"
     volumes:

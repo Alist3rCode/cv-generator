@@ -13,18 +13,20 @@ docker compose version
 
 ---
 
-## 1. Récupérer le projet
+## 1. Télécharger les fichiers de déploiement
+
+Aucun `git clone` nécessaire — télécharger uniquement les deux fichiers requis :
 
 ```bash
-git clone https://github.com/Alist3rCode/cv-generator.git
-cd cv-generator
+mkdir cv-generator && cd cv-generator
+
+curl -O https://raw.githubusercontent.com/Alist3rCode/cv-generator/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/Alist3rCode/cv-generator/main/.env.example
 ```
 
 ---
 
 ## 2. Configurer l'environnement
-
-Copier le fichier d'exemple et l'éditer :
 
 ```bash
 cp .env.example .env
@@ -59,8 +61,8 @@ docker compose up -d
 ```
 
 Docker va :
-1. Télécharger l'image PostgreSQL 16
-2. Builder l'image de l'application (Python 3.12 + LibreOffice — **première fois : ~5 min**)
+1. Télécharger l'image de l'application depuis GitHub Container Registry
+2. Télécharger l'image PostgreSQL 16
 3. Démarrer la base de données, attendre qu'elle soit prête
 4. Démarrer l'application sur le port 9000
 5. Créer automatiquement les tables, les langues par défaut et le compte admin
@@ -71,7 +73,7 @@ docker compose ps
 docker compose logs -f app
 ```
 
-L'application est accessible sur **http://<IP-du-serveur>:9000**
+L'application est accessible sur **http://\<IP-du-serveur\>:9000**
 
 ---
 
@@ -100,8 +102,8 @@ docker compose logs -f app     # Application seulement
 
 ### Mettre à jour l'application
 ```bash
-git pull
-docker compose up -d --build
+docker compose pull            # Télécharger la dernière image
+docker compose up -d           # Redémarrer avec la nouvelle image
 ```
 
 ### Sauvegarder la base de données
@@ -142,8 +144,8 @@ docker compose logs db
 docker compose restart db
 ```
 
-**Rebuild complet (si l'image est corrompue) :**
+**Forcer le retéléchargement de l'image :**
 ```bash
-docker compose down
-docker compose up -d --build --force-recreate
+docker compose pull
+docker compose up -d --force-recreate
 ```
