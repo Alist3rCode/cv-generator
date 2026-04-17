@@ -225,9 +225,6 @@ Un template de base prêt à l'emploi est téléchargeable depuis la page **Temp
 
 - [ ] Import de CV existant (PDF / Word) via IA
 - [ ] Traduction automatique des champs via IA
-- [ ] Support photo de profil
-- [ ] Gestion admin avancée des utilisateurs par organisation
-- [ ] Export PDF via Docker (LibreOffice headless)
 
 ## Licence
 
