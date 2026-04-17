@@ -136,6 +136,39 @@ body.has-sidebar {
   text-align: center;
 }
 
+/* Photo de profil dans la sidebar */
+.sidebar-photo-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* Zone photo dans la page profil */
+.profile-photo-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 2px dashed var(--bs-border-color);
+  overflow: hidden;
+  background: var(--bs-tertiary-bg);
+}
+.profile-photo-placeholder {
+  font-size: 4rem;
+  color: var(--bs-secondary-color);
+  line-height: 1;
+}
+.profile-photo-preview {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 /* Labels */
 .sidebar-label {
   display: flex;

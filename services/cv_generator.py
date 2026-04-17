@@ -61,6 +61,7 @@ from typing import Any
 
 from docx import Document
 from docx.oxml.ns import qn
+from docx.shared import Cm
 from lxml import etree
 
 
@@ -564,6 +565,41 @@ def _expand_table_section(
         break
 
 
+# ── Photo ──────────────────────────────────────────────────────────────────
+
+def _replace_photo_in_doc(doc: Document, photo_path: str, size_cm: float = 2.5) -> None:
+    """
+    Remplace le marqueur {{PHOTO}} par une image inline dans le document.
+    La photo est redimensionnée à size_cm × size_cm (carré).
+    """
+    MARKER = "{{PHOTO}}"
+    photo_path_obj = Path(photo_path)
+    if not photo_path_obj.exists():
+        _replace_in_doc(doc, {MARKER: ""})
+        return
+
+    def _try_replace_in_paragraph(para) -> bool:
+        full_text = "".join(r.text for r in para.runs)
+        if MARKER not in full_text:
+            return False
+        # Vider tous les runs (effacer le marqueur)
+        for run in para.runs:
+            run.text = run.text.replace(MARKER, "")
+        # Ajouter un run avec l'image
+        run = para.add_run()
+        run.add_picture(str(photo_path_obj), width=Cm(size_cm), height=Cm(size_cm))
+        return True
+
+    for para in doc.paragraphs:
+        _try_replace_in_paragraph(para)
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    _try_replace_in_paragraph(para)
+
+
 # ── Fonction principale ────────────────────────────────────────────────────
 
 def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: str) -> None:
@@ -609,6 +645,15 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
         "{{TRIGRAMME}}":  trigramme,
     }
     _replace_in_doc(doc, simple)
+
+    # ── Photo de profil ──
+    photo_url = (prof.photo_url if prof else None) or ""
+    if photo_url:
+        # photo_url = "/static/uploads/profiles/xxx.jpg" → chemin relatif
+        photo_path = photo_url.lstrip("/")
+        _replace_photo_in_doc(doc, photo_path)
+    else:
+        _replace_in_doc(doc, {"{{PHOTO}}": ""})
 
     # Remplacements dans les headers/footers
     for section in doc.sections:
@@ -752,25 +797,34 @@ def convert_docx_to_pdf(docx_path: str, pdf_path: str) -> None:
     candidates = [
         "soffice", "libreoffice",
         r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files\LibreOffice\program\swriter.exe",
         r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\swriter.exe",
         "/usr/bin/soffice", "/usr/bin/libreoffice", "/usr/local/bin/soffice",
     ]
+    last_error = ""
     for soffice in candidates:
         try:
             result = subprocess.run(
-                [soffice, "--headless", "--convert-to", "pdf", "--outdir",
-                 str(Path(pdf_path).parent), docx_path],
-                capture_output=True, timeout=60,
+                [soffice, "--headless", "--norestore", "--convert-to", "pdf",
+                 "--outdir", str(Path(pdf_path).parent), docx_path],
+                capture_output=True, timeout=120,
             )
             if result.returncode == 0:
                 generated = Path(docx_path).with_suffix(".pdf")
                 if generated.exists() and str(generated) != pdf_path:
                     generated.rename(pdf_path)
                 return
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+            # Garder le dernier stderr pour le message d'erreur
+            last_error = (result.stderr or b"").decode(errors="replace").strip()
+        except FileNotFoundError:
+            continue
+        except subprocess.TimeoutExpired:
+            last_error = f"{soffice} : timeout dépassé (120 s)"
             continue
 
+    detail = f" — {last_error}" if last_error else ""
     raise RuntimeError(
-        "Export PDF non disponible : LibreOffice n'est pas installé. "
+        f"Export PDF non disponible : LibreOffice n'a pas pu convertir le fichier{detail}. "
         "Sur Linux : sudo apt install libreoffice"
     )

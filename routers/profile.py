@@ -2,17 +2,21 @@
 routers/profile.py — Dashboard + formulaire de profil complet (avec bio multi-langue)
 """
 
+import os
 import uuid
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, Profile, Language, Bio, Experience, Formation, Competence, Certification, ProfilLangue, CEFRLevelEnum, CEFR_LABELS
 from routers.auth import require_user
+
+PHOTO_DIR = Path(os.getenv("PHOTO_DIR", "static/uploads/profiles"))
 
 router = APIRouter(tags=["profile"])
 templates = Jinja2Templates(directory="templates")
@@ -263,7 +267,49 @@ def edit_profile(
 
     db.commit()
     if request.headers.get("X-Requested-With") == "fetch":
-        from fastapi.responses import JSONResponse
         return JSONResponse({"ok": True})
     redirect_lang = f"?language_id={language_id}" if language_id else ""
     return RedirectResponse(url=f"/profile/edit{redirect_lang}", status_code=303)
+
+
+@router.post("/profile/photo")
+async def upload_profile_photo(
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{current_user.id}.jpg"
+    filepath = PHOTO_DIR / filename
+    content = await photo.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    photo_url = f"/static/uploads/profiles/{filename}"
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if profile:
+        profile.photo_url = photo_url
+    else:
+        profile = Profile(
+            id=uuid.uuid4(),
+            user_id=current_user.id,
+            photo_url=photo_url,
+        )
+        db.add(profile)
+    db.commit()
+    return JSONResponse({"ok": True, "photo_url": photo_url})
+
+
+@router.post("/profile/photo/delete")
+def delete_profile_photo(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if profile and profile.photo_url:
+        filepath = Path(profile.photo_url.lstrip("/"))
+        if filepath.exists():
+            filepath.unlink()
+        profile.photo_url = None
+        db.commit()
+    return JSONResponse({"ok": True})

@@ -125,6 +125,7 @@ cat backup_20250101.sql | docker compose exec -T db psql -U cvgen cvgen
 | `./data/` | Base de données PostgreSQL |
 | `./uploads/` | Templates Word importés |
 | `./exports/` | CV générés (Word / PDF) |
+| `./static/uploads/` | Photos de profil des utilisateurs |
 
 Ces dossiers sont créés automatiquement au premier `docker compose up`.  
 **Ne pas les supprimer** — ils contiennent toutes les données de l'application.

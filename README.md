@@ -174,6 +174,7 @@ Le moteur `cv_generator.py` remplace les balises `{{NOM}}` dans le template en p
 | `{{LINKEDIN}}` | URL LinkedIn |
 | `{{POSTE}}` | Titre / poste professionnel |
 | `{{BIO}}` | Texte de présentation |
+| `{{PHOTO}}` | Photo de profil (carré 2,5 cm × 2,5 cm) — remplacée par une image inline si uploadée, sinon supprimée |
 
 ### Sections répétées (tableaux Word)
 

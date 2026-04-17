@@ -188,7 +188,13 @@
     <div class="sidebar-divider"></div>
 
     <a href="/profile/edit" class="sidebar-link {% if '/profile' in request.url.path %}active{% endif %}">
-      <i class="bi bi-person-circle sidebar-icon"></i>
+      <span id="sidebarProfileIcon">
+        {% if current_user.profile and current_user.profile.photo_url %}
+          <img src="{{ current_user.profile.photo_url }}" class="sidebar-photo-icon" alt="Photo" />
+        {% else %}
+          <i class="bi bi-person-circle sidebar-icon"></i>
+        {% endif %}
+      </span>
       <span class="sidebar-label">{{ current_user.prenom }} {{ current_user.nom }}</span>
     </a>
     <!-- Toggle thème -->

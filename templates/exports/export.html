@@ -40,6 +40,14 @@
   background:rgba(25,135,84,.1);
 }
 
+/* ── Progression export ─────────────────────────────── */
+.export-progress-list .list-group-item { font-size:.9rem; border-radius:6px !important; margin-bottom:4px; }
+.step-pending { background: rgba(var(--bs-warning-rgb),.08); }
+.step-done    { background: rgba(var(--bs-success-rgb),.08); }
+.step-error   { background: rgba(var(--bs-danger-rgb),.08); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display:inline-block; animation: spin .8s linear infinite; }
+
 /* ── Boutons export ──────────────────────────────────── */
 .export-btn {
   display:flex; align-items:center; gap:10px; padding:11px 26px;
@@ -128,6 +136,11 @@
           </svg>
           Export PDF
         </button>
+      </div>
+
+      <!-- Indicateur de progression (affiché pendant la génération PDF) -->
+      <div id="exportProgress" class="mt-3" style="display:none">
+        <div class="list-group list-group-flush export-progress-list" id="exportProgressList"></div>
       </div>
     </form>
   </div>
@@ -306,6 +319,64 @@
     b.addEventListener('click', function() { formatInput.value = b.dataset.format; });
   });
 
+  // ── Progression PDF (étapes client-side) ─────────────────────────────
+  var PDF_STEPS = [
+    { delay:    0, icon: 'bi-file-earmark-word text-primary',   text: 'Génération du document Word…' },
+    { delay: 1500, icon: 'bi-arrow-repeat text-warning spin',   text: 'Conversion en PDF via LibreOffice (peut prendre 15–30 s)…' },
+  ];
+  var _progressTimers = [];
+
+  function startProgress(isPdf) {
+    var prog = document.getElementById('exportProgress');
+    var list = document.getElementById('exportProgressList');
+    list.innerHTML = '';
+    prog.style.display = '';
+    _progressTimers.forEach(clearTimeout);
+    _progressTimers = [];
+
+    var steps = isPdf ? PDF_STEPS : [PDF_STEPS[0]];
+    steps.forEach(function(step, idx) {
+      var t = setTimeout(function() {
+        // Marquer l'étape précédente comme terminée
+        var prev = list.querySelector('.step-pending');
+        if (prev) {
+          prev.classList.remove('step-pending');
+          prev.classList.add('step-done');
+          prev.querySelector('.step-icon').className = 'step-icon bi bi-check-circle-fill text-success me-2';
+        }
+        var item = document.createElement('div');
+        item.className = 'list-group-item list-group-item-action py-2 px-3 d-flex align-items-center step-pending';
+        item.innerHTML = '<i class="step-icon bi ' + step.icon + ' me-2"></i><span>' + step.text + '</span>';
+        list.appendChild(item);
+      }, step.delay);
+      _progressTimers.push(t);
+    });
+  }
+
+  function stopProgress(success) {
+    _progressTimers.forEach(clearTimeout);
+    _progressTimers = [];
+    var list = document.getElementById('exportProgressList');
+    var last = list.querySelector('.step-pending');
+    if (last) {
+      last.classList.remove('step-pending');
+      if (success) {
+        last.classList.add('step-done');
+        last.querySelector('.step-icon').className = 'step-icon bi bi-check-circle-fill text-success me-2';
+      } else {
+        last.classList.add('step-error');
+        last.querySelector('.step-icon').className = 'step-icon bi bi-x-circle-fill text-danger me-2';
+      }
+    }
+    // Masquer après 2 s si succès
+    if (success) {
+      setTimeout(function() {
+        document.getElementById('exportProgress').style.display = 'none';
+        list.innerHTML = '';
+      }, 2000);
+    }
+  }
+
   // ── Soumission via fetch ──────────────────────────────────────────────
   var form = document.getElementById('exportForm');
   if (!form) return;
@@ -313,14 +384,18 @@
   form.addEventListener('submit', function(e) {
     e.preventDefault();
 
+    var clickedFormat = formatInput.value;
+    var isPdf = clickedFormat === 'pdf';
+
     // Désactiver les deux boutons + spinner
     exportBtns.forEach(function(b) { b.disabled = true; });
-    var clickedFormat = formatInput.value;
-    if (clickedFormat === 'pdf') {
+    if (isPdf) {
       btnPdf.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération…';
     } else {
       btnWord.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération…';
     }
+
+    startProgress(isPdf);
 
     fetch('/exports/generate', {
       method: 'POST',
@@ -330,8 +405,8 @@
     .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
     .then(function(res) {
       if (!res.ok) {
+        stopProgress(false);
         var msg = res.data.error || 'Erreur serveur';
-        // Afficher l'erreur sous le formulaire
         var errEl = document.getElementById('exportError');
         if (!errEl) {
           errEl = document.createElement('div');
@@ -343,6 +418,7 @@
         errEl.style.display = '';
         return;
       }
+      stopProgress(true);
       var data = res.data;
       var errEl = document.getElementById('exportError');
       if (errEl) errEl.style.display = 'none';
@@ -355,6 +431,7 @@
       _prependExportRow(data);
     })
     .catch(function() {
+      stopProgress(false);
       alert('Une erreur réseau est survenue lors de la génération.');
     })
     .finally(function() {

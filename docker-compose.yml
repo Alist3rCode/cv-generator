@@ -22,6 +22,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./exports:/app/exports
+      - ./static/uploads:/app/static/uploads
     env_file:
       - .env
     depends_on:

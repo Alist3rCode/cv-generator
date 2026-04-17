@@ -3,6 +3,10 @@
 {% block title %}Mon profil — CV Generator{% endblock %}
 
 {% block content %}
+<!-- Cropper.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+
 <h3 class="mb-4"><i class="bi bi-person-vcard"></i> Mon profil</h3>
 
 <div class="card shadow-sm">
@@ -11,20 +15,56 @@
           id="profileForm" data-autosave-mode="edit">
       <input type="hidden" name="language_id" value="{{ active_language.id if active_language else '' }}" />
 
-      <!-- Infos fixes (read-only) -->
-      <div class="row mb-3">
-        <div class="col-md-6">
-          <label class="form-label">Prénom</label>
-          <input type="text" class="form-control" value="{{ current_user.prenom }}" disabled />
+      <!-- Infos fixes + Photo -->
+      <div class="row mb-3 align-items-start">
+        <!-- Gauche : Prénom, Nom, Email -->
+        <div class="col-md-8">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Prénom</label>
+              <input type="text" class="form-control" value="{{ current_user.prenom }}" disabled />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Nom</label>
+              <input type="text" class="form-control" value="{{ current_user.nom }}" disabled />
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" value="{{ current_user.email }}" disabled />
+          </div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">Nom</label>
-          <input type="text" class="form-control" value="{{ current_user.nom }}" disabled />
+
+        <!-- Droite : Photo de profil -->
+        <div class="col-md-4">
+          <label class="form-label">Photo de profil</label>
+          <div class="profile-photo-area">
+            {% if profile and profile.photo_url %}
+              <img src="{{ profile.photo_url }}" id="profilePhotoPreview"
+                   class="profile-photo-preview" alt="Photo de profil" />
+              <div id="profilePhotoPlaceholder" class="profile-photo-placeholder d-none">
+                <i class="bi bi-person-circle"></i>
+              </div>
+            {% else %}
+              <div id="profilePhotoPlaceholder" class="profile-photo-placeholder">
+                <i class="bi bi-person-circle"></i>
+              </div>
+              <img src="" id="profilePhotoPreview"
+                   class="profile-photo-preview d-none" alt="Photo de profil" />
+            {% endif %}
+          </div>
+          <div class="d-flex gap-2 mt-2">
+            <button type="button" class="btn btn-sm btn-outline-primary flex-fill"
+                    onclick="document.getElementById('photoFileInput').click()">
+              <i class="bi bi-camera"></i> Changer
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="deletePhotoBtn"
+              {% if not (profile and profile.photo_url) %}style="display:none"{% endif %}>
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+          <input type="file" id="photoFileInput" accept="image/*" class="d-none" />
         </div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-control" value="{{ current_user.email }}" disabled />
       </div>
 
       <!-- Téléphone + LinkedIn (fixes, non traduisibles) -->
@@ -151,6 +191,50 @@
   </div>
 </div>
 
+<!-- Modale confirmation suppression photo -->
+<div class="modal fade" id="deletePhotoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> Supprimer la photo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        Cette action est irréversible. La photo sera définitivement supprimée.
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmDeletePhotoBtn">
+          <i class="bi bi-trash"></i> Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modale recadrage photo -->
+<div class="modal fade" id="cropModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-crop"></i> Recadrer la photo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center p-3">
+        <div style="max-height:380px; overflow:hidden;">
+          <img id="cropperImg" src="" alt="Photo à recadrer" style="max-width:100%; display:block;" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="confirmCropBtn">
+          <i class="bi bi-check2"></i> Confirmer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   var form       = document.getElementById('profileForm');
@@ -223,6 +307,118 @@
     bindRow(clone);
     clone.querySelector('input[name="langue_noms"]').focus();
   });
+
+  // ── Photo de profil ──────────────────────────────────────────────────────
+  var photoInput          = document.getElementById('photoFileInput');
+  var cropModalEl         = document.getElementById('cropModal');
+  var deleteModalEl       = document.getElementById('deletePhotoModal');
+  var cropperImg          = document.getElementById('cropperImg');
+  var confirmCropBtn      = document.getElementById('confirmCropBtn');
+  var confirmDeleteBtn    = document.getElementById('confirmDeletePhotoBtn');
+  var preview             = document.getElementById('profilePhotoPreview');
+  var placeholder         = document.getElementById('profilePhotoPlaceholder');
+  var deleteBtn           = document.getElementById('deletePhotoBtn');
+  var sidebarIcon         = document.getElementById('sidebarProfileIcon');
+  var cropperInst         = null;
+
+  // Bootstrap Modals initialisés à la demande (Bootstrap JS chargé après ce bloc)
+  function getCropModal()   { return bootstrap.Modal.getOrCreateInstance(cropModalEl); }
+  function getDeleteModal() { return bootstrap.Modal.getOrCreateInstance(deleteModalEl); }
+
+  // Met à jour l'icône sidebar sans rechargement
+  function updateSidebarIcon(photoUrl) {
+    if (!sidebarIcon) return;
+    if (photoUrl) {
+      sidebarIcon.innerHTML = '<img src="' + photoUrl + '" class="sidebar-photo-icon" alt="Photo" />';
+    } else {
+      sidebarIcon.innerHTML = '<i class="bi bi-person-circle sidebar-icon"></i>';
+    }
+  }
+
+  photoInput.addEventListener('change', function() {
+    var file = this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      cropperImg.src = e.target.result;
+      getCropModal().show();
+      cropModalEl.addEventListener('shown.bs.modal', function initCropper() {
+        cropModalEl.removeEventListener('shown.bs.modal', initCropper);
+        if (cropperInst) { cropperInst.destroy(); cropperInst = null; }
+        cropperInst = new Cropper(cropperImg, {
+          aspectRatio: 1,
+          viewMode: 2,
+          autoCropArea: 0.9,
+        });
+      });
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+
+  confirmCropBtn.addEventListener('click', function() {
+    if (!cropperInst) return;
+    confirmCropBtn.disabled = true;
+    confirmCropBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    cropperInst.getCroppedCanvas({ width: 400, height: 400 }).toBlob(function(blob) {
+      var fd = new FormData();
+      fd.append('photo', blob, 'photo.jpg');
+      fetch('/profile/photo', {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'fetch' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          var url = data.photo_url + '?t=' + Date.now();
+          preview.src = url;
+          preview.classList.remove('d-none');
+          if (placeholder) placeholder.classList.add('d-none');
+          if (deleteBtn) deleteBtn.style.display = '';
+          updateSidebarIcon(url);
+          getCropModal().hide();
+        }
+      })
+      .finally(function() {
+        confirmCropBtn.disabled = false;
+        confirmCropBtn.innerHTML = '<i class="bi bi-check2"></i> Confirmer';
+      });
+    }, 'image/jpeg', 0.9);
+  });
+
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', function() {
+      getDeleteModal().show();
+    });
+  }
+
+  if (confirmDeleteBtn) {
+    confirmDeleteBtn.addEventListener('click', function() {
+      confirmDeleteBtn.disabled = true;
+      confirmDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+      fetch('/profile/photo/delete', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fetch' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          preview.classList.add('d-none');
+          preview.src = '';
+          if (placeholder) placeholder.classList.remove('d-none');
+          if (deleteBtn) deleteBtn.style.display = 'none';
+          updateSidebarIcon(null);
+          getDeleteModal().hide();
+        }
+      })
+      .finally(function() {
+        confirmDeleteBtn.disabled = false;
+        confirmDeleteBtn.innerHTML = '<i class="bi bi-trash"></i> Supprimer';
+      });
+    });
+  }
+  // ────────────────────────────────────────────────────────────────────────
 })();
 </script>
 {{ unsaved_guard("profileForm") }}
