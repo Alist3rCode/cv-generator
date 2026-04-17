@@ -28,7 +28,7 @@ EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.get("/", response_class=HTMLResponse)
 def export_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
 
     # Templates actifs des organisations de l'utilisateur
     org_ids = [uo.organisation_id for uo in current_user.user_organisations]
@@ -46,16 +46,34 @@ def export_page(request: Request, db: Session = Depends(get_db), current_user: U
         .all()
     )
 
-    # Langues ayant au moins une donnée (expérience, formation, certification ou bio)
+    uid = current_user.id
+
+    # Totaux uniques (tous GIDs confondus)
+    all_exp_gids  = {str(e.gid) for e in db.query(Experience).filter(Experience.user_id == uid, Experience.deleted_at == None).all()}
+    all_form_gids = {str(f.gid) for f in db.query(Formation).filter(Formation.user_id == uid, Formation.deleted_at == None).all()}
+    all_cert_gids = {str(c.gid) for c in db.query(Certification).filter(Certification.user_id == uid, Certification.deleted_at == None).all()}
+    all_comp_gids = {str(c.gid) for c in db.query(Competence).filter(Competence.user_id == uid, Competence.deleted_at == None).all()}
+    total_items = len(all_exp_gids) + len(all_form_gids) + len(all_cert_gids) + len(all_comp_gids) + 1  # +1 pour bio
+
+    # Langues ayant au moins une donnée + % de complétion
     langs_with_data = set()
+    langs_completion: dict = {}   # {lang_id_str: int 0-100}
+
     for lang in languages:
-        lid = lang.id
-        has_exp  = db.query(Experience).filter(Experience.user_id == current_user.id, Experience.language_id == lid, Experience.deleted_at == None).first()
-        has_form = db.query(Formation).filter(Formation.user_id == current_user.id, Formation.language_id == lid, Formation.deleted_at == None).first()
-        has_cert = db.query(Certification).filter(Certification.user_id == current_user.id, Certification.language_id == lid, Certification.deleted_at == None).first()
-        has_bio  = db.query(Bio).filter(Bio.user_id == current_user.id, Bio.language_id == lid).first()
-        if has_exp or has_form or has_cert or has_bio:
-            langs_with_data.add(str(lid))
+        lid     = lang.id
+        lid_str = str(lid)
+
+        k_exp  = len({str(e.gid) for e in db.query(Experience).filter(Experience.user_id == uid, Experience.language_id == lid, Experience.deleted_at == None).all()})
+        k_form = len({str(f.gid) for f in db.query(Formation).filter(Formation.user_id == uid, Formation.language_id == lid, Formation.deleted_at == None).all()})
+        k_cert = len({str(c.gid) for c in db.query(Certification).filter(Certification.user_id == uid, Certification.language_id == lid, Certification.deleted_at == None).all()})
+        k_comp = len({str(c.gid) for c in db.query(Competence).filter(Competence.user_id == uid, Competence.language_id == lid, Competence.deleted_at == None).all()})
+        has_bio = db.query(Bio).filter(Bio.user_id == uid, Bio.language_id == lid).first() is not None
+
+        k_total = k_exp + k_form + k_cert + k_comp + (1 if has_bio else 0)
+        if k_total > 0:
+            langs_with_data.add(lid_str)
+        pct = int(k_total / total_items * 100) if total_items > 0 else 0
+        langs_completion[lid_str] = min(pct, 100)
 
     # Langue par défaut : français (code 'fr'), sinon première
     default_lang = next((l for l in languages if l.code == 'fr'), languages[0] if languages else None)
@@ -68,6 +86,7 @@ def export_page(request: Request, db: Session = Depends(get_db), current_user: U
         "previous_exports": previous_exports,
         "formats": ExportFormatEnum,
         "langs_with_data": langs_with_data,
+        "langs_completion": langs_completion,
         "default_lang_id": str(default_lang.id) if default_lang else "",
     })
 

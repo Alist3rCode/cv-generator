@@ -90,9 +90,11 @@ class Language(AuditMixin, Base):
     """
     __tablename__ = "language"
 
-    id   = Column(Uuid, primary_key=True, default=uuid.uuid4)
-    code = Column(String(5),  nullable=False, unique=True)   # 'fr', 'en', 'es'...
-    nom  = Column(String(50), nullable=False)                 # 'Français', 'English'...
+    id         = Column(Uuid,    primary_key=True, default=uuid.uuid4)
+    code       = Column(String(5),  nullable=False, unique=True)   # 'fr', 'gb', 'es'...
+    nom        = Column(String(50), nullable=False)                 # 'Français', 'English'...
+    is_active  = Column(Boolean, nullable=False, default=True)      # False = masquée pour les utilisateurs
+    sort_order = Column(Integer, nullable=False, default=0)         # Ordre d'affichage
 
     # Relations
     bios           = relationship("Bio",           back_populates="language")
@@ -236,6 +238,7 @@ class Bio(AuditMixin, Base):
     user_id     = Column(Uuid, ForeignKey("user.id"),     nullable=False)
     language_id = Column(Uuid, ForeignKey("language.id"), nullable=False)
     texte       = Column(Text, nullable=False)
+    poste       = Column(String(200), nullable=True)   # Titre professionnel traduit
 
     # Relations
     user     = relationship("User",     back_populates="bios",     foreign_keys=[user_id])

@@ -3,103 +3,103 @@
 
 {% block admin_content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4><i class="bi bi-trash"></i> Corbeille</h4>
+  <h4><i class="bi bi-trash"></i> Corbeille
+    {% if trash_count > 0 %}
+    <span class="badge bg-danger ms-2 fs-6">{{ trash_count }}</span>
+    {% endif %}
+  </h4>
 </div>
 
-{% set total = experiences|length + formations|length + certifications|length + competences|length %}
-{% if total == 0 %}
+{% if not users_with_trash %}
   <p class="text-muted">La corbeille est vide.</p>
 {% else %}
 
-  {% if experiences %}
-  <h6 class="text-muted mb-2">Expériences</h6>
-  <ul class="list-group mb-4">
-    {% for exp in experiences %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-      <div>
-        <strong>{{ exp.titre_poste }}</strong> — {{ exp.entreprise }}
-        {% if exp.location %}<span class="text-muted"> · {{ exp.location }}</span>{% endif %}
-        <small class="text-muted d-block">
+{% for user in users_with_trash %}
+{% set uid = user.id | string %}
+
+<div class="card shadow-sm mb-4">
+  <!-- En-tête utilisateur -->
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-person-circle text-secondary"></i>
+    <span class="fw-semibold">{{ user.prenom }} {{ user.nom }}</span>
+    <span class="text-muted small">{{ user.email }}</span>
+  </div>
+  <div class="list-group list-group-flush">
+
+    {% for exp in exp_by_user.get(uid, []) %}
+    <div class="list-group-item d-flex align-items-center gap-3">
+      <i class="bi bi-briefcase flex-shrink-0" style="color:#198754; font-size:1.1rem;"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">{{ exp.titre_poste }} <span class="text-muted fw-normal">— {{ exp.entreprise }}</span>{% if exp.location %}<span class="text-muted fw-normal"> · {{ exp.location }}</span>{% endif %}</div>
+        <small class="text-muted">
           {{ exp.date_debut.strftime('%m/%Y') }} → {% if exp.date_fin %}{{ exp.date_fin.strftime('%m/%Y') }}{% else %}Présent{% endif %}
           &nbsp;·&nbsp; Supprimé le {{ exp.deleted_at.strftime('%d/%m/%Y') }}
         </small>
       </div>
-      <form method="post" action="/experiences/{{ exp.id }}/restore" class="ms-3 flex-shrink-0">
+      <form method="post" action="/experiences/{{ exp.id }}/restore" class="flex-shrink-0">
         <button type="submit" class="btn btn-sm btn-outline-success">
           <i class="bi bi-arrow-counterclockwise"></i> Restaurer
         </button>
       </form>
-    </li>
+    </div>
     {% endfor %}
-  </ul>
-  {% endif %}
 
-  {% if formations %}
-  <h6 class="text-muted mb-2">Formations</h6>
-  <ul class="list-group mb-4">
-    {% for f in formations %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-      <div>
-        <strong>{{ f.diplome }}</strong> — {{ f.etablissement }}
-        {% if f.ville %}<span class="text-muted"> · {{ f.ville }}</span>{% endif %}
-        <small class="text-muted d-block">
+    {% for f in form_by_user.get(uid, []) %}
+    <div class="list-group-item d-flex align-items-center gap-3">
+      <i class="bi bi-mortarboard flex-shrink-0" style="color:#0dcaf0; font-size:1.1rem;"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">{{ f.diplome }} <span class="text-muted fw-normal">— {{ f.etablissement }}</span>{% if f.ville %}<span class="text-muted fw-normal"> · {{ f.ville }}</span>{% endif %}</div>
+        <small class="text-muted">
           {{ f.date_debut.strftime('%Y') }}
           &nbsp;·&nbsp; Supprimé le {{ f.deleted_at.strftime('%d/%m/%Y') }}
         </small>
       </div>
-      <form method="post" action="/formations/{{ f.id }}/restore" class="ms-3 flex-shrink-0">
+      <form method="post" action="/formations/{{ f.id }}/restore" class="flex-shrink-0">
         <button type="submit" class="btn btn-sm btn-outline-success">
           <i class="bi bi-arrow-counterclockwise"></i> Restaurer
         </button>
       </form>
-    </li>
+    </div>
     {% endfor %}
-  </ul>
-  {% endif %}
 
-  {% if certifications %}
-  <h6 class="text-muted mb-2">Certifications</h6>
-  <ul class="list-group mb-4">
-    {% for cert in certifications %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-      <div>
-        <strong>{{ cert.titre }}</strong> — {{ cert.organisme }}
-        <small class="text-muted d-block">
+    {% for cert in cert_by_user.get(uid, []) %}
+    <div class="list-group-item d-flex align-items-center gap-3">
+      <i class="bi bi-patch-check flex-shrink-0" style="color:#ffc107; font-size:1.1rem;"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">{{ cert.titre }} <span class="text-muted fw-normal">— {{ cert.organisme }}</span></div>
+        <small class="text-muted">
           {{ cert.date_obtention.strftime('%m/%Y') }}
           &nbsp;·&nbsp; Supprimé le {{ cert.deleted_at.strftime('%d/%m/%Y') }}
         </small>
       </div>
-      <form method="post" action="/certifications/{{ cert.id }}/restore" class="ms-3 flex-shrink-0">
+      <form method="post" action="/certifications/{{ cert.id }}/restore" class="flex-shrink-0">
         <button type="submit" class="btn btn-sm btn-outline-success">
           <i class="bi bi-arrow-counterclockwise"></i> Restaurer
         </button>
       </form>
-    </li>
+    </div>
     {% endfor %}
-  </ul>
-  {% endif %}
 
-  {% if competences %}
-  <h6 class="text-muted mb-2">Compétences</h6>
-  <ul class="list-group mb-4">
-    {% for comp in competences %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-      <div>
-        <strong>{{ comp.nom }}</strong>
-        <span class="badge bg-secondary ms-1">{{ comp.type.value }}</span>
-        <small class="text-muted d-block">
-          Supprimé le {{ comp.deleted_at.strftime('%d/%m/%Y') }}
-        </small>
+    {% for comp in comp_by_user.get(uid, []) %}
+    <div class="list-group-item d-flex align-items-center gap-3">
+      <i class="bi bi-stars flex-shrink-0" style="color:#6366f1; font-size:1.1rem;"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">{{ comp.nom }}
+          <span class="badge ms-1 {% if comp.type.value == 'hard' %}bg-primary{% else %}bg-secondary{% endif %}">{{ comp.type.value }}</span>
+        </div>
+        <small class="text-muted">Supprimé le {{ comp.deleted_at.strftime('%d/%m/%Y') }}</small>
       </div>
-      <form method="post" action="/competences/{{ comp.id }}/restore" class="ms-3 flex-shrink-0">
+      <form method="post" action="/competences/{{ comp.id }}/restore" class="flex-shrink-0">
         <button type="submit" class="btn btn-sm btn-outline-success">
           <i class="bi bi-arrow-counterclockwise"></i> Restaurer
         </button>
       </form>
-    </li>
+    </div>
     {% endfor %}
-  </ul>
-  {% endif %}
 
+  </div>
+</div>
+
+{% endfor %}
 {% endif %}
 {% endblock %}

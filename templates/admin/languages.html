@@ -1,0 +1,335 @@
+{% extends "admin/layout.html" %}
+{% block title %}Langues — Administration{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4><i class="bi bi-translate"></i> Gestion des langues</h4>
+</div>
+
+<!-- ── Liste des langues existantes ──────────────────────────────────────── -->
+<div class="card shadow-sm mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" id="langTable">
+      <thead>
+        <tr>
+          <th style="width:36px;"></th>
+          <th style="width:56px;">Drapeau</th>
+          <th>Langue</th>
+          <th>Code</th>
+          <th>Statut</th>
+          <th style="width:120px;">Activer</th>
+        </tr>
+      </thead>
+      <tbody id="langTableBody">
+        {% for lang in languages %}
+        <tr id="langRow-{{ lang.id }}" data-lang-id="{{ lang.id }}">
+          <td class="drag-handle text-muted" style="cursor:grab;user-select:none;text-align:center;">
+            <i class="bi bi-grip-vertical"></i>
+          </td>
+          <td>
+            <img src="https://flagcdn.com/{{ lang.code }}.svg"
+                 alt="{{ lang.nom }}" width="32" height="22"
+                 style="border-radius:3px;object-fit:cover;"
+                 onerror="this.style.opacity='.25'" />
+          </td>
+          <td class="fw-semibold">{{ lang.nom }}</td>
+          <td><code>{{ lang.code }}</code></td>
+          <td>
+            {% if lang.is_active %}
+            <span class="badge bg-success" id="badge-{{ lang.id }}">Active</span>
+            {% else %}
+            <span class="badge bg-secondary" id="badge-{{ lang.id }}">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if lang.code == 'fr' %}
+            <div class="form-check form-switch mb-0" title="Le français ne peut pas être désactivé">
+              <input class="form-check-input" type="checkbox" checked disabled
+                     style="opacity:.5;" />
+            </div>
+            {% else %}
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input lang-toggle" type="checkbox"
+                     id="toggle-{{ lang.id }}"
+                     data-lang-id="{{ lang.id }}"
+                     {% if lang.is_active %}checked{% endif %} />
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="reorderStatus" class="px-3 py-2 small text-muted" style="display:none;">
+    <i class="bi bi-check-circle text-success"></i> Ordre sauvegardé
+  </div>
+</div>
+
+<!-- ── Ajouter une nouvelle langue ───────────────────────────────────────── -->
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-plus-circle"></i> Ajouter une langue
+  </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-end" id="newLangForm">
+
+      <!-- Code -->
+      <div class="col-md-3">
+        <label class="form-label">Code pays <span class="text-danger">*</span></label>
+        <input type="text" id="newLangCode" class="form-control" maxlength="5"
+               placeholder="ex : pt, nl, ar…"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <div class="form-text">Code ISO du drapeau (<a href="https://flagcdn.com" target="_blank" rel="noopener">flagcdn.com</a>)</div>
+      </div>
+
+      <!-- Libellé -->
+      <div class="col-md-4">
+        <label class="form-label">Libellé <span class="text-danger">*</span></label>
+        <input type="text" id="newLangNom" class="form-control"
+               placeholder="ex : Português, Nederlands…" />
+      </div>
+
+      <!-- Aperçu drapeau -->
+      <div class="col-md-2 d-flex flex-column align-items-center gap-1">
+        <label class="form-label">Aperçu</label>
+        <div id="flagPreview" style="width:44px;height:30px;border-radius:4px;overflow:hidden;
+             background:var(--bs-tertiary-bg);display:flex;align-items:center;justify-content:center;">
+          <i class="bi bi-flag text-muted"></i>
+        </div>
+      </div>
+
+      <!-- Boutons (double bouton : valider / annuler) -->
+      <div class="col-md-3 d-flex gap-2 align-items-end">
+        <button type="button" id="btnSaveLang"
+                class="btn btn-success flex-grow-1" disabled>
+          <i class="bi bi-floppy"></i> Enregistrer
+        </button>
+        <button type="button" id="btnResetLang"
+                class="btn btn-outline-secondary" title="Réinitialiser">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+      </div>
+
+    </div>
+    <!-- Message d'erreur -->
+    <div id="newLangError" class="alert alert-danger mt-3 mb-0" style="display:none;"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+(function() {
+  // ── Drag-and-drop reorder ─────────────────────────────────────────────────
+  var tbody        = document.getElementById('langTableBody');
+  var reorderStatus = document.getElementById('reorderStatus');
+  var _reorderTimer = null;
+
+  if (tbody && window.Sortable) {
+    Sortable.create(tbody, {
+      handle:    '.drag-handle',
+      animation: 150,
+      ghostClass: 'table-active',
+      onEnd: function() {
+        clearTimeout(_reorderTimer);
+        _reorderTimer = setTimeout(_saveOrder, 500);
+      },
+    });
+  }
+
+  function _saveOrder() {
+    var ids = Array.from(tbody.querySelectorAll('tr[data-lang-id]'))
+                   .map(function(tr) { return tr.dataset.langId; });
+    fetch('/admin/languages/reorder', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body:    JSON.stringify(ids),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        reorderStatus.style.display = '';
+        clearTimeout(_reorderTimer);
+        _reorderTimer = setTimeout(function() { reorderStatus.style.display = 'none'; }, 2000);
+      }
+    })
+    .catch(function() { /* silencieux */ });
+  }
+
+  // ── Toggles (auto-save) ───────────────────────────────────────────────────
+  document.querySelectorAll('.lang-toggle').forEach(function(toggle) {
+    toggle.addEventListener('change', function() {
+      var langId = toggle.dataset.langId;
+      var checked = toggle.checked;
+
+      fetch('/admin/languages/' + langId + '/toggle', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fetch' },
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          toggle.checked = !checked;   // rollback
+          alert(data.error);
+          return;
+        }
+        var badge = document.getElementById('badge-' + langId);
+        if (badge) {
+          badge.textContent  = data.is_active ? 'Active' : 'Inactive';
+          badge.className    = 'badge ' + (data.is_active ? 'bg-success' : 'bg-secondary');
+        }
+      })
+      .catch(function() {
+        toggle.checked = !checked;    // rollback réseau
+        alert('Erreur réseau.');
+      });
+    });
+  });
+
+  // ── Aperçu drapeau live ───────────────────────────────────────────────────
+  var codeInput = document.getElementById('newLangCode');
+  var nomInput  = document.getElementById('newLangNom');
+  var preview   = document.getElementById('flagPreview');
+  var saveBtn   = document.getElementById('btnSaveLang');
+  var resetBtn  = document.getElementById('btnResetLang');
+  var errEl     = document.getElementById('newLangError');
+
+  var _previewTimer = null;
+
+  function updatePreview() {
+    var code = codeInput.value.trim().toLowerCase();
+    preview.innerHTML = '';
+    if (code.length >= 2) {
+      var img = document.createElement('img');
+      img.src    = 'https://flagcdn.com/' + code + '.svg';
+      img.width  = 44;
+      img.height = 30;
+      img.style.cssText = 'object-fit:cover;border-radius:3px;';
+      img.onerror = function() {
+        preview.innerHTML = '<i class="bi bi-question text-muted"></i>';
+      };
+      preview.appendChild(img);
+    } else {
+      preview.innerHTML = '<i class="bi bi-flag text-muted"></i>';
+    }
+    checkForm();
+  }
+
+  function checkForm() {
+    var valid = codeInput.value.trim().length >= 2 && nomInput.value.trim().length >= 1;
+    saveBtn.disabled = !valid;
+  }
+
+  codeInput.addEventListener('input', function() {
+    clearTimeout(_previewTimer);
+    _previewTimer = setTimeout(updatePreview, 200);
+  });
+  nomInput.addEventListener('input', checkForm);
+
+  // ── Enregistrement ─────────────────────────────────────────────────────────
+  saveBtn.addEventListener('click', function() {
+    var code = codeInput.value.trim().toLowerCase();
+    var nom  = nomInput.value.trim();
+    if (!code || !nom) return;
+
+    saveBtn.disabled = true;
+    errEl.style.display = 'none';
+
+    var fd = new FormData();
+    fd.append('code', code);
+    fd.append('nom',  nom);
+
+    fetch('/admin/languages/new', {
+      method:  'POST',
+      headers: { 'X-Requested-With': 'fetch' },
+      body:    fd,
+    })
+    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+    .then(function(res) {
+      if (!res.ok) {
+        errEl.textContent   = res.data.error || 'Erreur serveur';
+        errEl.style.display = '';
+        saveBtn.disabled    = false;
+        return;
+      }
+      var d = res.data;
+      _appendLangRow(d);
+      _resetForm();
+    })
+    .catch(function() {
+      errEl.textContent   = 'Erreur réseau.';
+      errEl.style.display = '';
+      saveBtn.disabled    = false;
+    });
+  });
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  resetBtn.addEventListener('click', _resetForm);
+
+  function _resetForm() {
+    codeInput.value     = '';
+    nomInput.value      = '';
+    preview.innerHTML   = '<i class="bi bi-flag text-muted"></i>';
+    saveBtn.disabled    = true;
+    errEl.style.display = 'none';
+  }
+
+  // ── Ajout dynamique d'une ligne dans le tableau ───────────────────────────
+  function _appendLangRow(lang) {
+    var tbody = document.getElementById('langTableBody');
+    var tr    = document.createElement('tr');
+    tr.id     = 'langRow-' + lang.id;
+    tr.dataset.langId = lang.id;
+    tr.innerHTML = [
+      '<td class="drag-handle text-muted" style="cursor:grab;user-select:none;text-align:center;">',
+      '  <i class="bi bi-grip-vertical"></i>',
+      '</td>',
+      '<td>',
+      '  <img src="https://flagcdn.com/' + lang.code + '.svg"',
+      '       alt="' + _esc(lang.nom) + '" width="32" height="22"',
+      '       style="border-radius:3px;object-fit:cover;"',
+      '       onerror="this.style.opacity=\'.25\'" />',
+      '</td>',
+      '<td class="fw-semibold">' + _esc(lang.nom) + '</td>',
+      '<td><code>' + _esc(lang.code) + '</code></td>',
+      '<td><span class="badge bg-success" id="badge-' + lang.id + '">Active</span></td>',
+      '<td>',
+      '  <div class="form-check form-switch mb-0">',
+      '    <input class="form-check-input lang-toggle" type="checkbox"',
+      '           id="toggle-' + lang.id + '"',
+      '           data-lang-id="' + lang.id + '" checked />',
+      '  </div>',
+      '</td>',
+    ].join('');
+
+    // Attacher le toggle listener
+    var toggle = tr.querySelector('.lang-toggle');
+    if (toggle) {
+      toggle.addEventListener('change', function() {
+        var lid     = toggle.dataset.langId;
+        var checked = toggle.checked;
+        fetch('/admin/languages/' + lid + '/toggle', {
+          method: 'POST', headers: { 'X-Requested-With': 'fetch' },
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) { toggle.checked = !checked; alert(data.error); return; }
+          var badge = document.getElementById('badge-' + lid);
+          if (badge) {
+            badge.textContent = data.is_active ? 'Active' : 'Inactive';
+            badge.className   = 'badge ' + (data.is_active ? 'bg-success' : 'bg-secondary');
+          }
+        })
+        .catch(function() { toggle.checked = !checked; alert('Erreur réseau.'); });
+      });
+    }
+
+    tbody.appendChild(tr);
+  }
+
+  function _esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+</script>
+{% endblock %}

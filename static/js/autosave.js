@@ -35,18 +35,16 @@
       .then(function (data) {
         if (data.redirect) { window.location.href = data.redirect; return; }
         if (onSuccess) onSuccess();
-        window.__formDirty = false;
+        // __formDirty est recalculé dans onSuccess — ne pas écraser ici
       })
       .catch(function (err) {
         console.warn('[AutoSave] error:', err);
       });
   }
 
-  /* ── Nettoyer tous les dirty après un save réussi ─────────────── */
-  function cleanAll(form) {
-    form.querySelectorAll('.as-field-wrap.is-dirty, .as-textarea-wrap.is-dirty')
-      .forEach(function (w) { w.classList.remove('is-dirty'); });
-    window.__formDirty = false;
+  /* ── Recalculer __formDirty après nettoyage local ─────────────── */
+  function recheckDirty(form) {
+    window.__formDirty = !!form.querySelector('.as-field-wrap.is-dirty, .as-textarea-wrap.is-dirty');
   }
 
   /* ── Créer un bouton icon ─────────────────────────────────────── */
@@ -60,7 +58,6 @@
 
   /* ── Wrapper champ 1 ligne ────────────────────────────────────── */
   function wrapInput(field, form, opts) {
-    // Éviter le double wrapping
     if (field.closest('.as-field-wrap')) return;
 
     var wrap = document.createElement('div');
@@ -68,7 +65,7 @@
     field.parentNode.insertBefore(wrap, field);
     wrap.appendChild(field);
 
-    var origVal = field.value;
+    var origVal  = field.value;
     var saveBtn  = makeBtn('bi-floppy', 'as-save');
     var resetBtn = makeBtn('bi-arrow-counterclockwise', 'as-reset');
     wrap.appendChild(saveBtn);
@@ -82,13 +79,14 @@
     function doSave() {
       submitFetch(form, opts && opts.beforeSubmit, function () {
         origVal = field.value;
-        cleanAll(form);
+        wrap.classList.remove('is-dirty');
+        recheckDirty(form);
       });
     }
     function doReset() {
       field.value = origVal;
       wrap.classList.remove('is-dirty');
-      window.__formDirty = !!form.querySelector('.as-field-wrap.is-dirty, .as-textarea-wrap.is-dirty');
+      recheckDirty(form);
     }
 
     field.addEventListener('input', check);
@@ -122,13 +120,14 @@
     function doSave() {
       submitFetch(form, opts && opts.beforeSubmit, function () {
         origVal = field.value;
-        cleanAll(form);
+        wrap.classList.remove('is-dirty');
+        recheckDirty(form);
       });
     }
     function doReset() {
       field.value = origVal;
       wrap.classList.remove('is-dirty');
-      window.__formDirty = !!form.querySelector('.as-field-wrap.is-dirty, .as-textarea-wrap.is-dirty');
+      recheckDirty(form);
     }
 
     field.addEventListener('input', check);
@@ -165,13 +164,14 @@
       hiddenInput.value = quill.root.innerHTML;
       submitFetch(form, opts && opts.beforeSubmit, function () {
         origVal = quill.root.innerHTML;
-        cleanAll(form);
+        wrap.classList.remove('is-dirty');
+        recheckDirty(form);
       });
     }
     function doReset() {
       quill.root.innerHTML = origVal;
       wrap.classList.remove('is-dirty');
-      window.__formDirty = !!form.querySelector('.as-field-wrap.is-dirty, .as-textarea-wrap.is-dirty');
+      recheckDirty(form);
     }
 
     quill.on('text-change', check);
@@ -183,7 +183,7 @@
   function bindSelect(sel, form, opts) {
     sel.addEventListener('change', function () {
       submitFetch(form, opts && opts.beforeSubmit, function () {
-        window.__formDirty = false;
+        recheckDirty(form);
       });
     });
   }
@@ -192,30 +192,25 @@
   window.initAutoSave = function (form, opts) {
     opts = opts || {};
 
-    // Champs texte 1 ligne
     var inputSel = [
       'input[type=text]', 'input[type=tel]', 'input[type=url]',
       'input[type=month]', 'input[type=date]',
     ].map(function (s) { return s + ':not([disabled]):not([data-no-autosave])'; }).join(',');
     form.querySelectorAll(inputSel).forEach(function (f) { wrapInput(f, form, opts); });
 
-    // Textareas
     form.querySelectorAll('textarea:not([disabled]):not([data-no-autosave])').forEach(function (f) {
       wrapTextarea(f, form, opts);
     });
 
-    // Selects
     form.querySelectorAll('select:not([disabled]):not([data-no-autosave])').forEach(function (s) {
       bindSelect(s, form, opts);
     });
 
-    // Quill
     if (opts.quill && opts.quillHidden) {
       wrapQuill(opts.quill, opts.quillHidden, form, opts);
     }
   };
 
-  // Helpers pour les lignes dynamiques (profil langues)
   window.asWrapInput  = function (f, form, opts) { wrapInput(f, form, opts); };
   window.asBindSelect = function (s, form, opts) { bindSelect(s, form, opts); };
 

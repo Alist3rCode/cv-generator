@@ -11,7 +11,7 @@
           id="profileForm" data-autosave-mode="edit">
       <input type="hidden" name="language_id" value="{{ active_language.id if active_language else '' }}" />
 
-      <!-- Infos fixes -->
+      <!-- Infos fixes (read-only) -->
       <div class="row mb-3">
         <div class="col-md-6">
           <label class="form-label">Prénom</label>
@@ -26,12 +26,8 @@
         <label class="form-label">Email</label>
         <input type="email" class="form-control" value="{{ current_user.email }}" disabled />
       </div>
-      <div class="mb-3">
-        <label class="form-label">Poste / Titre professionnel</label>
-        <input type="text" name="poste" class="form-control"
-               value="{{ profile.poste if profile and profile.poste else '' }}"
-               placeholder="ex : Consultant Senior Data & IA" />
-      </div>
+
+      <!-- Téléphone + LinkedIn (fixes, non traduisibles) -->
       <div class="row mb-3">
         <div class="col-md-6">
           <label class="form-label">Téléphone</label>
@@ -49,11 +45,39 @@
 
       <hr />
 
+      <!-- Sélecteur de langue -->
+      {% if languages %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold text-muted small text-uppercase">
+          <i class="bi bi-translate"></i> Version langue
+        </label>
+        {{ lang_tabs(languages, active_language.id | string if active_language else '', bios_by_lang, "/profile/edit") }}
+      </div>
+      {% endif %}
+
+      <!-- Poste / Titre professionnel (translatable) -->
+      <div class="mb-3">
+        <label class="form-label">Poste / Titre professionnel</label>
+        <input type="text" name="poste" class="form-control"
+               value="{{ profile_poste }}"
+               placeholder="ex : Consultant Senior Data & IA" />
+        {% if active_language %}
+        <div class="form-text">
+          Langue active : <strong>{{ active_language.nom }}</strong>
+          {% if active_language.id | string in bios_by_lang %}
+            <span class="badge bg-success ms-1"><i class="bi bi-check"></i> Sauvegardée</span>
+          {% else %}
+            <span class="badge bg-warning text-dark ms-1">Non sauvegardée</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
       <!-- Langues parlées -->
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <label class="form-label fw-semibold mb-0">
-            <i class="bi bi-translate"></i> Langues parlées
+            <i class="bi bi-chat-dots"></i> Langues parlées
           </label>
           <button type="button" class="btn btn-sm btn-outline-success" id="addLangueBtn">
             <i class="bi bi-plus-circle"></i> Ajouter
@@ -108,28 +132,14 @@
 
       <hr />
 
-      <!-- Bio multi-langue -->
+      <!-- Bio / Présentation (translatable) -->
       <div class="mb-3">
         <label class="form-label fw-semibold">
           <i class="bi bi-chat-left-text"></i> Bio / Présentation
         </label>
 
-        {% if languages %}
-          {{ lang_tabs(languages, active_language.id | string if active_language else '', bios_by_lang, "/profile/edit") }}
-        {% endif %}
-
         <textarea name="bio_texte" class="form-control" rows="4"
                   placeholder="Rédigez votre présentation dans cette langue...">{{ bio.texte if bio else '' }}</textarea>
-        <div class="form-text">
-          {% if active_language %}
-            Langue active : <strong>{{ active_language.nom }}</strong>
-            {% if active_language.id | string in bios_by_lang %}
-              <span class="badge bg-success ms-1"><i class="bi bi-check"></i> Sauvegardée</span>
-            {% else %}
-              <span class="badge bg-warning text-dark ms-1">Non sauvegardée</span>
-            {% endif %}
-          {% endif %}
-        </div>
       </div>
 
       <div class="mt-2">
@@ -152,9 +162,41 @@
   // Init auto-save sur les champs statiques
   initAutoSave(form);
 
+  // ── Duplication de langue ────────────────────────────────────────────────
+  var STORE_KEY = 'langDup_profile';
+  var HAS_TRANS = {{ 'true' if (active_language and (active_language.id | string) in bios_by_lang) else 'false' }};
+  var DUP_FIELDS = ['poste', 'bio_texte'];
+
+  // Capturer les valeurs avant de naviguer vers une autre langue
+  document.querySelectorAll('.lang-tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var data = {};
+      DUP_FIELDS.forEach(function(n) {
+        var el = form.querySelector('[name="' + n + '"]');
+        if (el) data[n] = el.value;
+      });
+      try { sessionStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+    });
+  });
+
+  // Restaurer si pas de traduction pour cette langue
+  if (!HAS_TRANS) {
+    var stored = null;
+    try { stored = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null'); } catch(e) {}
+    if (stored) {
+      DUP_FIELDS.forEach(function(n) {
+        var el = form.querySelector('[name="' + n + '"]');
+        if (el && stored[n]) {
+          el.value = stored[n];
+          el.dispatchEvent(new Event('input', {bubbles: true}));
+        }
+      });
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   // ── Ajout / suppression de lignes langue ─────────────────────────────────
   function bindRow(row) {
-    // Wrapper les nouveaux champs dynamiques
     var input = row.querySelector('input[name="langue_noms"]');
     var sel   = row.querySelector('select[name="langue_niveaux"]');
     if (input) asWrapInput(input, form);
@@ -162,13 +204,11 @@
 
     row.querySelector('.remove-langue-btn').addEventListener('click', function() {
       row.remove();
-      // Sauvegarde immédiate après suppression d'une ligne
       var fd = new FormData(form);
       fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, body: fd });
     });
   }
 
-  // Lier les lignes existantes (leurs champs sont déjà wrappés par initAutoSave)
   langsList.querySelectorAll('.langue-row').forEach(function(row) {
     row.querySelector('.remove-langue-btn').addEventListener('click', function() {
       row.remove();

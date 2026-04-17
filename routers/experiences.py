@@ -100,7 +100,7 @@ def list_experiences(request: Request, db: Session = Depends(get_db), current_us
     experiences = _dedup_by_gid(all_exps)
     if not experiences:
         return RedirectResponse(url="/experiences/new", status_code=302)
-    languages   = db.query(Language).all()
+    languages   = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     # Langues disponibles par GID
     langs_by_gid = {}
     for exp in all_exps:
@@ -115,7 +115,7 @@ def list_experiences(request: Request, db: Session = Depends(get_db), current_us
 
 @router.get("/new", response_class=HTMLResponse)
 def new_experience_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     comps_hard, comps_soft = _load_comps_for_user(db, current_user.id)
     return templates.TemplateResponse("experiences/form.html", {
         "request": request, "current_user": current_user,
@@ -171,7 +171,7 @@ def edit_experience_page(
     if not source:
         return RedirectResponse(url="/experiences/", status_code=303)
 
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
 
     # Toutes les traductions du même GID
     translations = db.query(Experience).filter(
@@ -204,6 +204,7 @@ def edit_experience_page(
 @router.post("/{exp_id}/edit")
 def update_experience(
     exp_id: str,
+    request: Request,
     titre_poste: str          = Form(...),
     entreprise: str           = Form(...),
     location: Optional[str]   = Form(None),
@@ -257,6 +258,55 @@ def update_experience(
     if request.headers.get("X-Requested-With") == "fetch":
         return JSONResponse({"ok": True})
     return RedirectResponse(url=f"/experiences/{exp_id}/edit?language_id={language_id}", status_code=303)
+
+
+@router.get("/{exp_id}/content")
+def get_experience_content(
+    exp_id: str,
+    language_id: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Retourne le contenu textuel d'une traduction pour pré-remplissage."""
+    source = db.query(Experience).filter(
+        Experience.id == uuid.UUID(exp_id), Experience.user_id == current_user.id
+    ).first()
+    if not source:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    exp = db.query(Experience).filter(
+        Experience.gid == source.gid,
+        Experience.user_id == current_user.id,
+        Experience.language_id == uuid.UUID(language_id),
+    ).first()
+    if not exp:
+        return JSONResponse({"error": "No translation"}, status_code=404)
+    return JSONResponse({
+        "titre_poste":     exp.titre_poste or "",
+        "entreprise":      exp.entreprise or "",
+        "location":        exp.location or "",
+        "project_summary": exp.project_summary or "",
+        "description":     exp.description or "",
+    })
+
+
+@router.post("/{exp_id}/delete-translation")
+def delete_experience_translation(
+    exp_id: str,
+    language_id: str   = Form(...),
+    db: Session        = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    source = db.query(Experience).filter(
+        Experience.id == uuid.UUID(exp_id), Experience.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Experience).filter(
+            Experience.gid == source.gid,
+            Experience.user_id == current_user.id,
+            Experience.language_id == uuid.UUID(language_id),
+        ).delete()
+        db.commit()
+    return RedirectResponse(url="/experiences/", status_code=303)
 
 
 @router.post("/{exp_id}/save-skills")

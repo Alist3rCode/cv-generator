@@ -34,21 +34,35 @@ def list_competences(request: Request, db: Session = Depends(get_db), current_us
     competences = _dedup_by_gid(all_items)
     if not competences:
         return RedirectResponse(url="/competences/new", status_code=302)
-    languages   = db.query(Language).all()
-    langs_by_gid = {}
+    languages   = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
+    langs_by_gid: dict = {}
     for c in all_items:
         langs_by_gid.setdefault(str(c.gid), set()).add(str(c.language_id))
+
+    total_gids = len(langs_by_gid)
+    # Nombre de GIDs traduits par langue (pour barre de progression)
+    per_lang_counts = {}
+    for lang in languages:
+        lid = str(lang.id)
+        per_lang_counts[lid] = sum(1 for langs in langs_by_gid.values() if lid in langs)
+
+    # Convertir sets → listes pour usage JS (tojson)
+    langs_by_gid_js = {gid: list(langs) for gid, langs in langs_by_gid.items()}
+
     return templates.TemplateResponse("competences/list.html", {
         "request": request, "current_user": current_user,
         "competences": competences, "languages": languages,
         "langs_by_gid": langs_by_gid,
+        "langs_by_gid_js": langs_by_gid_js,
+        "per_lang_counts": per_lang_counts,
+        "total_gids": total_gids,
         "skill_types": SkillTypeEnum, "skill_levels": SkillLevelEnum,
     })
 
 
 @router.get("/new", response_class=HTMLResponse)
 def new_competence_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     return templates.TemplateResponse("competences/form.html", {
         "request": request, "current_user": current_user,
         "languages": languages, "comp": None, "gid": None,
@@ -89,7 +103,7 @@ def edit_competence_page(
     if not source:
         return RedirectResponse(url="/competences/", status_code=303)
 
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     translations = db.query(Competence).filter(
         Competence.gid == source.gid, Competence.user_id == current_user.id
     ).all()

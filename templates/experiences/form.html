@@ -211,12 +211,72 @@
     // Mode création : soumission traditionnelle
     form.addEventListener('submit', function() { syncQuill(); syncHiddenInputs(); window.__formDirty = false; });
   } else {
-    // Mode édition : auto-save
-    initAutoSave(form, {
-      beforeSubmit: function() { syncQuill(); syncHiddenInputs(); },
-      quill:        quill,
-      quillHidden:  descInput,
-    });
+    // Mode édition
+    var GID         = '{{ gid or "" }}';
+    var STORE_KEY   = 'langDup_' + GID;
+    var HAS_TRANS   = {{ 'true' if exp else 'false' }};
+    var TEXT_FIELDS = ['titre_poste', 'entreprise', 'location', 'project_summary'];
+
+    // Vérifier si du contenu pré-rempli est disponible
+    var _stored = null;
+    if (GID && !HAS_TRANS) {
+      try { _stored = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null'); } catch(e) {}
+    }
+
+    if (_stored) {
+      // ── Mode pré-remplissage : bannière globale, pas d'autosave par champ ──
+      TEXT_FIELDS.forEach(function(n) {
+        var el = form.querySelector('[name="' + n + '"]');
+        if (el && _stored[n] != null) el.value = _stored[n];
+      });
+      if (_stored['description']) {
+        quill.root.innerHTML = _stored['description'];
+        descInput.value = _stored['description'];
+      }
+
+      var banner = document.createElement('div');
+      banner.className = 'alert alert-info d-flex align-items-center justify-content-between gap-3 mb-3';
+      banner.innerHTML = '<div><i class="bi bi-translate me-2"></i>Contenu pré-rempli depuis une autre langue. Vérifiez les champs et enregistrez.</div>'
+        + '<button type="button" class="btn btn-primary btn-sm flex-shrink-0" id="globalSaveBtn">'
+        + '<i class="bi bi-floppy me-1"></i> Enregistrer cette traduction</button>';
+      form.insertBefore(banner, form.firstChild);
+
+      document.getElementById('globalSaveBtn').addEventListener('click', function() {
+        syncQuill(); syncHiddenInputs();
+        var fd = new FormData(form);
+        fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, body: fd })
+          .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+          .then(function() {
+            try { sessionStorage.removeItem(STORE_KEY); } catch(e) {}
+            window.location.reload();
+          })
+          .catch(function(err) { console.warn('[PrefillSave] error:', err); });
+      });
+
+    } else {
+      // ── Mode autosave normal ─────────────────────────────────────────
+      initAutoSave(form, {
+        beforeSubmit: function() { syncQuill(); syncHiddenInputs(); },
+        quill:        quill,
+        quillHidden:  descInput,
+      });
+
+      // Capturer avant navigation vers autre langue
+      if (GID) {
+        document.querySelectorAll('.lang-tab-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var data = {};
+            TEXT_FIELDS.forEach(function(n) {
+              var el = form.querySelector('[name="' + n + '"]');
+              if (el) data[n] = el.value;
+            });
+            data['description'] = quill ? quill.root.innerHTML : descInput.value;
+            try { sessionStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+          });
+        });
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────
   }
 
   // ── Autocomplete localisation (Nominatim) ────────────────────────────

@@ -77,7 +77,44 @@
 (function() {
   var form = document.getElementById('mainForm');
   if (!form) return;
-  {% if source_id %}initAutoSave(form);{% endif %}
+  {% if source_id %}
+  initAutoSave(form);
+
+  // ── Duplication de langue ────────────────────────────────────────────
+  (function() {
+    var GID       = '{{ gid or "" }}';
+    if (!GID) return;
+    var STORE_KEY = 'langDup_' + GID;
+    var HAS_TRANS = {{ 'true' if comp else 'false' }};
+    var TEXT_FIELDS = ['nom'];
+
+    document.querySelectorAll('.lang-tab-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var data = {};
+        TEXT_FIELDS.forEach(function(n) {
+          var el = form.querySelector('[name="' + n + '"]');
+          if (el) data[n] = el.value;
+        });
+        try { sessionStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+      });
+    });
+
+    if (!HAS_TRANS) {
+      var stored = null;
+      try { stored = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null'); } catch(e) {}
+      if (stored) {
+        TEXT_FIELDS.forEach(function(n) {
+          var el = form.querySelector('[name="' + n + '"]');
+          if (el && stored[n]) {
+            el.value = stored[n];
+            el.dispatchEvent(new Event('input', {bubbles: true}));
+          }
+        });
+      }
+    }
+  })();
+  // ────────────────────────────────────────────────────────────────────
+  {% endif %}
 })();
 </script>
 {{ unsaved_guard("mainForm") }}

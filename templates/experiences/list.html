@@ -1,17 +1,45 @@
 {% extends "base.html" %}
 {% block title %}Expériences — CV Generator{% endblock %}
 
-{% block head_extra %}
-<script>
-function softDelete(id, baseUrl) {
-  document.getElementById('softDeleteForm').action = baseUrl + id + '/soft-delete';
-  var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('softDeleteModal'));
-  modal.show();
-}
-</script>
-{% endblock %}
+{% block head_extra %}{% endblock %}
 
 {% block content %}
+<!-- ── Modale sélection langue source pour duplication ─────────────────────── -->
+<div class="modal fade" id="sourceLangModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0"><i class="bi bi-translate"></i> Traduire depuis…</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="sourceLangList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modale suppression ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="removeTransModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger"><i class="bi bi-trash"></i> Supprimer une traduction</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Vous êtes sur le point de supprimer la traduction en <strong id="removeTransLangName"></strong>.</p>
+        <p class="text-danger fw-semibold mb-0"><i class="bi bi-exclamation-triangle"></i> Cette action est irréversible.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <form id="removeTransForm" method="post" action="" class="d-inline">
+          <input type="hidden" name="language_id" id="removeTransLangId" value="" />
+          <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Supprimer définitivement</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="softDeleteModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -44,10 +72,12 @@ function softDelete(id, baseUrl) {
 {% endif %}
 
 {% for exp in experiences %}
+{% set gid_str = exp.gid | string %}
+{% set langs_here = langs_by_gid.get(gid_str, []) %}
 <div class="card mb-3 shadow-sm">
   <div class="card-body">
-    <div class="d-flex justify-content-between">
-      <div class="flex-grow-1 me-3">
+    <div class="d-flex justify-content-between align-items-start gap-3">
+      <div class="flex-grow-1 min-w-0">
         <h5 class="mb-1">{{ exp.titre_poste }}</h5>
         <p class="mb-1 text-muted">
           <i class="bi bi-building"></i> {{ exp.entreprise }}
@@ -63,18 +93,131 @@ function softDelete(id, baseUrl) {
         {% if exp.project_summary %}
         <p class="mt-2 mb-1"><strong>Projet :</strong> {{ exp.project_summary }}</p>
         {% endif %}
-        {% if exp.description %}
-        <div class="mt-2 mb-0 exp-description-preview">{{ exp.description | safe }}</div>
+        {% if languages %}
+        <div class="d-flex align-items-center gap-1 flex-wrap mt-2 pt-2 border-top">
+          {% for lang in languages %}
+          {% set translated = lang.id | string in langs_here %}
+          {% if translated %}
+          <span class="lang-version-pill translated">
+            <a href="/experiences/{{ exp.id }}/edit?language_id={{ lang.id }}"
+               class="pill-edit-link" title="Modifier en {{ lang.nom }}">
+              <img src="https://flagcdn.com/{{ lang.code }}.svg" alt="{{ lang.nom }}"
+                   width="16" height="12" style="border-radius:2px;object-fit:cover;"
+                   onerror="this.style.opacity='.3'" />
+              {{ lang.nom }}
+            </a>
+            <button type="button" class="pill-remove-btn"
+                    title="Retirer la traduction en {{ lang.nom }}"
+                    data-item-id="{{ exp.id }}"
+                    data-lang-id="{{ lang.id }}"
+                    data-lang-name="{{ lang.nom | e }}"
+                    data-base-url="/experiences/"
+                    onclick="confirmRemoveTrans(this)">
+              <i class="bi bi-dash-lg"></i>
+            </button>
+          </span>
+          {% else %}
+          <a href="/experiences/{{ exp.id }}/edit?language_id={{ lang.id }}"
+             class="lang-version-pill missing"
+             title="Traduire en {{ lang.nom }}"
+             data-item-id="{{ exp.id }}"
+             data-gid="{{ gid_str }}"
+             data-target-lang-id="{{ lang.id }}"
+             data-available-langs="{{ langs_here | list | join(',') }}"
+             onclick="handleMissingClick(event, this)">
+            <i class="bi bi-plus" style="font-size:.7rem;"></i>
+            <img src="https://flagcdn.com/{{ lang.code }}.svg" alt="{{ lang.nom }}"
+                 width="16" height="12" style="border-radius:2px;object-fit:cover;"
+                 onerror="this.style.opacity='.3'" />
+            {{ lang.nom }}
+          </a>
+          {% endif %}
+          {% endfor %}
+        </div>
         {% endif %}
       </div>
-      <div class="d-flex flex-column gap-2 ms-3 flex-shrink-0">
+      <div class="d-flex flex-column gap-2 flex-shrink-0">
         <a href="/experiences/{{ exp.id }}/edit" class="btn btn-outline-primary btn-sm">
           <i class="bi bi-pencil"></i>
         </a>
-        <button type="button" class="btn btn-outline-danger btn-sm" onclick="softDelete('{{ exp.id }}', '/experiences/')"><i class="bi bi-trash"></i></button>
+        <button type="button" class="btn btn-outline-danger btn-sm"
+                onclick="softDelete('{{ exp.id }}', '/experiences/')">
+          <i class="bi bi-trash"></i>
+        </button>
       </div>
     </div>
   </div>
 </div>
 {% endfor %}
+
+<script>
+// ── Infos langues (id → {nom, code}) ─────────────────────────────────────
+var LANG_INFO = {};
+{% for lang in languages %}
+LANG_INFO[{{ lang.id | string | tojson }}] = { nom: {{ lang.nom | tojson }}, code: {{ lang.code | tojson }} };
+{% endfor %}
+
+// ── État de la modale de sélection source ─────────────────────────────────
+var _pending = {};
+
+function handleMissingClick(e, pill) {
+  e.preventDefault();
+  var itemId      = pill.dataset.itemId;
+  var gid         = pill.dataset.gid;
+  var targetLang  = pill.dataset.targetLangId;
+  var targetUrl   = pill.href;
+  var available   = (pill.dataset.availableLangs || '').split(',').filter(Boolean);
+
+  if (available.length === 0) {
+    // Aucune traduction existante : formulaire vierge (normal pour la 1ère saisie)
+    window.location.href = targetUrl;
+    return;
+  }
+  if (available.length === 1) {
+    _fetchAndStore('/experiences/', itemId, gid, available[0], targetUrl);
+    return;
+  }
+  // Plusieurs sources → modale
+  _pending = { itemId: itemId, gid: gid, targetUrl: targetUrl };
+  var list = document.getElementById('sourceLangList');
+  list.innerHTML = '';
+  available.forEach(function(lid) {
+    var info = LANG_INFO[lid] || { nom: lid, code: 'xx' };
+    var btn  = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-outline-secondary d-flex align-items-center gap-2 w-100 mb-2';
+    btn.innerHTML = '<img src="https://flagcdn.com/' + info.code + '.svg" width="22" height="16"'
+      + ' style="border-radius:2px;object-fit:cover;" /> ' + info.nom;
+    btn.addEventListener('click', function() {
+      bootstrap.Modal.getInstance(document.getElementById('sourceLangModal')).hide();
+      _fetchAndStore('/experiences/', _pending.itemId, _pending.gid, lid, _pending.targetUrl);
+    });
+    list.appendChild(btn);
+  });
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('sourceLangModal')).show();
+}
+
+function _fetchAndStore(prefix, itemId, gid, sourceLangId, targetUrl) {
+  fetch(prefix + itemId + '/content?language_id=' + sourceLangId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      try { sessionStorage.setItem('langDup_' + gid, JSON.stringify(data)); } catch(ex) {}
+      window.location.href = targetUrl;
+    })
+    .catch(function() { window.location.href = targetUrl; });
+}
+
+// ── Suppression douce ─────────────────────────────────────────────────────
+function confirmRemoveTrans(btn) {
+  document.getElementById('removeTransLangName').textContent = btn.dataset.langName;
+  document.getElementById('removeTransLangId').value = btn.dataset.langId;
+  document.getElementById('removeTransForm').action = btn.dataset.baseUrl + btn.dataset.itemId + '/delete-translation';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('removeTransModal')).show();
+}
+
+function softDelete(id, baseUrl) {
+  document.getElementById('softDeleteForm').action = baseUrl + id + '/soft-delete';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('softDeleteModal')).show();
+}
+</script>
 {% endblock %}

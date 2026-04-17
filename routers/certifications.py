@@ -40,7 +40,7 @@ def list_certifications(request: Request, db: Session = Depends(get_db), current
     certs     = _dedup_by_gid(all_items)
     if not certs:
         return RedirectResponse(url="/certifications/new", status_code=302)
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     langs_by_gid = {}
     for c in all_items:
         langs_by_gid.setdefault(str(c.gid), set()).add(str(c.language_id))
@@ -52,7 +52,7 @@ def list_certifications(request: Request, db: Session = Depends(get_db), current
 
 @router.get("/new", response_class=HTMLResponse)
 def new_certification_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     return templates.TemplateResponse("certifications/form.html", {
         "request": request, "current_user": current_user,
         "languages": languages, "cert": None, "gid": None,
@@ -93,7 +93,7 @@ def edit_certification_page(
     if not source:
         return RedirectResponse(url="/certifications/", status_code=303)
 
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     translations = db.query(Certification).filter(
         Certification.gid == source.gid, Certification.user_id == current_user.id
     ).all()
@@ -147,6 +147,52 @@ def update_certification(
     if request.headers.get("X-Requested-With") == "fetch":
         return JSONResponse({"ok": True})
     return RedirectResponse(url=f"/certifications/{cid}/edit?language_id={language_id}", status_code=303)
+
+
+@router.get("/{cid}/content")
+def get_certification_content(
+    cid: str,
+    language_id: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Retourne le contenu textuel d'une traduction pour pré-remplissage."""
+    source = db.query(Certification).filter(
+        Certification.id == uuid.UUID(cid), Certification.user_id == current_user.id
+    ).first()
+    if not source:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    c = db.query(Certification).filter(
+        Certification.gid == source.gid,
+        Certification.user_id == current_user.id,
+        Certification.language_id == uuid.UUID(language_id),
+    ).first()
+    if not c:
+        return JSONResponse({"error": "No translation"}, status_code=404)
+    return JSONResponse({
+        "titre":     c.titre or "",
+        "organisme": c.organisme or "",
+    })
+
+
+@router.post("/{cid}/delete-translation")
+def delete_certification_translation(
+    cid: str,
+    language_id: str   = Form(...),
+    db: Session        = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    source = db.query(Certification).filter(
+        Certification.id == uuid.UUID(cid), Certification.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Certification).filter(
+            Certification.gid == source.gid,
+            Certification.user_id == current_user.id,
+            Certification.language_id == uuid.UUID(language_id),
+        ).delete()
+        db.commit()
+    return RedirectResponse(url="/certifications/", status_code=303)
 
 
 @router.post("/{cid}/soft-delete")

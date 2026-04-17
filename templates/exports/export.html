@@ -12,16 +12,32 @@
 }
 .lang-flag-btn img { width:36px; height:26px; object-fit:cover; border-radius:3px; }
 .lang-flag-btn span { font-size:.72rem; font-weight:500; white-space:nowrap; }
+.lang-flag-btn .pct-badge {
+  font-size:.65rem; padding:1px 5px; border-radius:20px;
+  font-weight:600; line-height:1.4;
+}
 .lang-flag-btn.disabled { opacity:.35; cursor:not-allowed; filter:grayscale(1); }
-.lang-flag-btn.selected {
-  border-color:#f59e0b;
+/* Bordure toujours visible selon progression */
+.lang-flag-btn.complete  { border-color:#198754; }
+.lang-flag-btn.partial   { border-color:#f59e0b; }
+.lang-flag-btn.selected  {
   box-shadow:0 0 0 3px rgba(245,158,11,.35);
   background:rgba(245,158,11,.08);
+}
+.lang-flag-btn.selected.complete {
+  border-color:#198754;
+  box-shadow:0 0 0 3px rgba(25,135,84,.3);
+  background:rgba(25,135,84,.06);
 }
 [data-bs-theme=dark] .lang-flag-btn.selected {
   border-color:#fbbf24;
   box-shadow:0 0 0 3px rgba(251,191,36,.3);
   background:rgba(251,191,36,.08);
+}
+[data-bs-theme=dark] .lang-flag-btn.selected.complete {
+  border-color:#198754;
+  box-shadow:0 0 0 3px rgba(25,135,84,.3);
+  background:rgba(25,135,84,.1);
 }
 
 /* ── Boutons export ──────────────────────────────────── */
@@ -69,14 +85,23 @@
           <label class="form-label fw-semibold">Langue</label>
           <div class="lang-picker" id="langPicker">
             {% for lang in languages %}
-            {% set has_data = lang.id | string in langs_with_data %}
+            {% set lid = lang.id | string %}
+            {% set has_data = lid in langs_with_data %}
+            {% set pct = langs_completion.get(lid, 0) %}
+            {% set is_complete = pct == 100 %}
             <button type="button"
-                    class="lang-flag-btn {% if not has_data %}disabled{% endif %}"
+                    class="lang-flag-btn {% if not has_data %}disabled{% elif is_complete %}complete{% else %}partial{% endif %}"
                     data-lang-id="{{ lang.id }}"
-                    title="{% if not has_data %}Aucune donnée disponible en {{ lang.nom }}{% else %}{{ lang.nom }}{% endif %}"
+                    data-complete="{{ 'true' if is_complete else 'false' }}"
+                    title="{% if not has_data %}Aucune donnée disponible en {{ lang.nom }}{% else %}{{ lang.nom }} — {{ pct }}% traduit{% endif %}"
                     {% if not has_data %}disabled{% endif %}>
               <img src="https://flagcdn.com/{{ lang.code }}.svg" alt="{{ lang.nom }}" />
               <span>{{ lang.nom }}</span>
+              {% if has_data %}
+              <span class="pct-badge {% if is_complete %}bg-success text-white{% else %}bg-warning text-dark{% endif %}">
+                {{ pct }}%
+              </span>
+              {% endif %}
             </button>
             {% endfor %}
           </div>
@@ -250,7 +275,12 @@
   function selectLang(id) {
     langIdInput.value = id;
     langBtns.forEach(function(btn) {
-      btn.classList.toggle('selected', btn.dataset.langId === id);
+      var isSel     = btn.dataset.langId === id;
+      var isComplete = btn.dataset.complete === 'true';
+      btn.classList.toggle('selected', isSel);
+      // Maintenir la classe complete/partial même quand sélectionné
+      btn.classList.toggle('complete', isComplete);
+      btn.classList.toggle('partial',  !isComplete);
     });
   }
 

@@ -604,7 +604,7 @@ def generate_cv_docx(template_path: str, profile: dict[str, Any], output_path: s
         "{{EMAIL}}":     user.email,
         "{{TELEPHONE}}": (prof.telephone if prof else "") or "",
         "{{LINKEDIN}}":  (prof.linkedin_url if prof else "") or "",
-        "{{POSTE}}":     (prof.poste if prof else "") or "",
+        "{{POSTE}}":     (bio.poste if bio and bio.poste else (prof.poste if prof else "")) or "",
         "{{BIO}}":        (bio.texte if bio else "") or "",
         "{{TRIGRAMME}}":  trigramme,
     }

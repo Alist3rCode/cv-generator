@@ -36,7 +36,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
     completion, criteria = compute_completion(current_user.id, db)
 
     # Donnees pour le resume CV
-    languages     = db.query(Language).all()
+    languages     = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     default_lang  = languages[0] if languages else None
 
     bio = None
@@ -135,7 +135,7 @@ def edit_profile_page(
     current_user: User = Depends(require_user),
 ):
     profile   = db.query(Profile).filter(Profile.user_id == current_user.id).first()
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
 
     # Langue active
     active_language = languages[0] if languages else None
@@ -162,6 +162,9 @@ def edit_profile_page(
         ProfilLangue.user_id == current_user.id
     ).order_by(ProfilLangue.created_at).all()
 
+    # Poste traduit : bio.poste pour la langue active, sinon profile.poste comme fallback
+    profile_poste = (bio.poste if bio and bio.poste else (profile.poste or '')) if bio else (profile.poste or '')
+
     return templates.TemplateResponse("profile/edit.html", {
         "request":         request,
         "current_user":    current_user,
@@ -172,6 +175,7 @@ def edit_profile_page(
         "bios_by_lang":    bios_by_lang,
         "profil_langues":  profil_langues,
         "cefr_levels":     [(e.value, CEFR_LABELS[e.value]) for e in CEFRLevelEnum],
+        "profile_poste":   profile_poste,
     })
 
 
@@ -190,12 +194,14 @@ def edit_profile(
     db: Session                 = Depends(get_db),
     current_user: User          = Depends(require_user),
 ):
-    # Sauvegarder le profil (téléphone, LinkedIn, poste)
+    # Sauvegarder le profil (téléphone, LinkedIn) — poste est désormais dans Bio par langue
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
     if profile:
         profile.telephone    = telephone or None
         profile.linkedin_url = linkedin_url or None
-        profile.poste        = poste or None
+        # Conserver profile.poste comme fallback si aucune bio traduite ne le fournit
+        if poste and not profile.poste:
+            profile.poste = poste or None
     else:
         profile = Profile(
             id=uuid.uuid4(),
@@ -225,9 +231,9 @@ def edit_profile(
         ))
     # ────────────────────────────────────────────────────────────────────────
 
-    # Sauvegarder la bio pour la langue active
+    # Sauvegarder la bio (texte + poste traduit) pour la langue active
     lang_id_str = (language_id or "").strip()
-    if bio_texte is not None and lang_id_str:
+    if lang_id_str:
         try:
             lang_uuid = uuid.UUID(lang_id_str)
         except ValueError:
@@ -237,17 +243,21 @@ def edit_profile(
                 Bio.user_id == current_user.id,
                 Bio.language_id == lang_uuid,
             ).first()
+            has_content = (bio_texte and bio_texte.strip()) or (poste and poste.strip())
             if bio:
-                if bio_texte.strip():
-                    bio.texte = bio_texte
+                if has_content:
+                    if bio_texte is not None:
+                        bio.texte = bio_texte if bio_texte.strip() else bio.texte
+                    bio.poste = poste or None
                 else:
                     db.delete(bio)
-            elif bio_texte.strip():
+            elif has_content:
                 bio = Bio(
                     id=uuid.uuid4(),
                     user_id=current_user.id,
                     language_id=lang_uuid,
-                    texte=bio_texte,
+                    texte=bio_texte or "",
+                    poste=poste or None,
                 )
                 db.add(bio)
 

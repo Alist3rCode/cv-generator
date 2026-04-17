@@ -2,29 +2,59 @@
 {% block title %}Compétences — CV Generator{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
   <h3><i class="bi bi-stars"></i> Compétences</h3>
   <a href="/competences/new" class="btn btn-success"><i class="bi bi-plus-circle"></i> Ajouter</a>
 </div>
 
+<!-- ── Barre de progression traductions ────────────────────────────────── -->
+{% if languages and total_gids > 0 %}
+<div class="card shadow-sm mb-4 px-3 py-2">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <span class="small text-muted fw-semibold me-1">Traduction&nbsp;:</span>
+    {% for lang in languages %}
+    {% set pct = ((per_lang_counts.get(lang.id | string, 0) / total_gids) * 100) | int %}
+    <button type="button"
+            class="lang-filter-btn d-flex align-items-center gap-1 border rounded px-2 py-1"
+            data-lang-id="{{ lang.id }}"
+            data-pct="{{ pct }}"
+            title="{{ lang.nom }} — {{ pct }}% traduit{% if pct < 100 %} · cliquer pour filtrer les items non traduits{% endif %}"
+            style="cursor:pointer;">
+      <img src="https://flagcdn.com/{{ lang.code }}.svg"
+           alt="{{ lang.nom }}" width="22" height="16"
+           style="border-radius:2px;object-fit:cover;" />
+      <span class="fw-semibold small">{{ lang.nom }}</span>
+      <span class="badge ms-1 {% if pct == 100 %}bg-success{% elif pct > 0 %}text-dark{% else %}bg-secondary{% endif %}"
+            style="{% if pct > 0 and pct < 100 %}background:#f59e0b;{% endif %}">{{ pct }}%</span>
+    </button>
+    {% endfor %}
+    <button type="button" id="clearFilterBtn"
+            class="btn btn-sm btn-outline-secondary ms-auto" style="display:none;">
+      <i class="bi bi-x-lg"></i> Tout afficher
+    </button>
+  </div>
+  <div id="filterMsg" class="mt-2 small text-muted fst-italic" style="display:none;"></div>
+</div>
+{% endif %}
+
 {% set hard_skills = competences | selectattr('type.value', 'equalto', 'hard') | list %}
 {% set soft_skills = competences | selectattr('type.value', 'equalto', 'soft') | list %}
 
-<div class="row">
-  <div class="col-md-6">
-    <h5 class="mb-3" style="color:#e05c1a;"><i class="bi bi-tools"></i> Hard Skills</h5>
+<div class="row" id="compCols">
+  <div class="col-md-6" id="hardCol">
+    <h5 class="mb-3"><i class="bi bi-tools"></i> Hard Skills</h5>
     {% if not hard_skills %}
-    <p class="text-muted">Aucun hard skill enregistré.</p>
+    <p class="text-muted" id="emptyHard">Aucun hard skill enregistré.</p>
     {% endif %}
     {% for c in hard_skills %}
-    <div class="card mb-2 shadow-sm">
+    <div class="card mb-2 shadow-sm comp-card" data-gid="{{ c.gid }}">
       <div class="card-body py-2 d-flex justify-content-between align-items-center">
         <div>
           <strong>{{ c.nom }}</strong>
           <div class="mt-1">
             {% for i in range(1, 5) %}
               {% if i <= c.niveau.value %}
-                <i class="bi bi-circle-fill" style="color:#e05c1a;"></i>
+                <i class="bi bi-circle-fill"></i>
               {% else %}
                 <i class="bi bi-circle text-secondary"></i>
               {% endif %}
@@ -46,13 +76,13 @@
     {% endfor %}
   </div>
 
-  <div class="col-md-6">
+  <div class="col-md-6" id="softCol">
     <h5 class="text-success mb-3"><i class="bi bi-person-heart"></i> Soft Skills</h5>
     {% if not soft_skills %}
-    <p class="text-muted">Aucun soft skill enregistré.</p>
+    <p class="text-muted" id="emptySoft">Aucun soft skill enregistré.</p>
     {% endif %}
     {% for c in soft_skills %}
-    <div class="card mb-2 shadow-sm">
+    <div class="card mb-2 shadow-sm comp-card" data-gid="{{ c.gid }}">
       <div class="card-body py-2 d-flex justify-content-between align-items-center">
         <div>
           <strong>{{ c.nom }}</strong>
@@ -114,25 +144,94 @@
 </div>
 
 <script>
+// ── Filtre par langue ─────────────────────────────────────────────────────
+var LANGS_BY_GID = {{ langs_by_gid_js | tojson }};
+var activeFilterLang = null;
+
+function applyLangFilter(langId, pct) {
+  activeFilterLang = langId;
+  var cards    = document.querySelectorAll('.comp-card');
+  var msgEl    = document.getElementById('filterMsg');
+  var clearBtn = document.getElementById('clearFilterBtn');
+
+  // Si 100% traduit : afficher message sans filtrer
+  var isComplete = (pct !== undefined ? pct : 0) >= 100;
+
+  cards.forEach(function(card) {
+    var gid   = card.dataset.gid;
+    var langs = LANGS_BY_GID[gid] || [];
+    if (!langId || isComplete) {
+      card.style.display = '';
+    } else {
+      var translated = langs.indexOf(langId) !== -1;
+      card.style.display = translated ? 'none' : '';
+    }
+  });
+
+  // Mettre à jour les boutons
+  document.querySelectorAll('.lang-filter-btn').forEach(function(btn) {
+    btn.style.boxShadow = btn.dataset.langId === langId
+      ? '0 0 0 3px rgba(99,102,241,.45)'
+      : '';
+    btn.style.background = btn.dataset.langId === langId
+      ? 'rgba(99,102,241,.1)'
+      : '';
+  });
+
+  if (langId) {
+    var langName = (document.querySelector('.lang-filter-btn[data-lang-id="' + langId + '"] .fw-semibold') || {}).textContent || '';
+    if (isComplete) {
+      if (msgEl) {
+        msgEl.innerHTML = '<i class="bi bi-check-circle-fill text-success me-1"></i>Toutes les compétences sont déjà traduites en <strong>' + langName + '</strong>.';
+        msgEl.style.display = '';
+      }
+      if (clearBtn) clearBtn.style.display = '';
+    } else {
+      var visibleCount = Array.from(cards).filter(function(c) { return c.style.display !== 'none'; }).length;
+      if (msgEl) {
+        msgEl.textContent = visibleCount === 0
+          ? 'Toutes les compétences sont déjà traduites dans cette langue.'
+          : visibleCount + ' compétence' + (visibleCount > 1 ? 's' : '') + ' à traduire en ' + langName + '.';
+        msgEl.style.display = '';
+      }
+      if (clearBtn) clearBtn.style.display = '';
+    }
+  } else {
+    if (msgEl)    msgEl.style.display    = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+}
+
+document.querySelectorAll('.lang-filter-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var langId = btn.dataset.langId;
+    var pct    = parseInt(btn.dataset.pct || '0', 10);
+    if (activeFilterLang === langId) {
+      applyLangFilter(null, 0);
+    } else {
+      applyLangFilter(langId, pct);
+    }
+  });
+});
+
+var clearBtn = document.getElementById('clearFilterBtn');
+if (clearBtn) clearBtn.addEventListener('click', function() { applyLangFilter(null, 0); });
+
+// ── Suppression ───────────────────────────────────────────────────────────
 var _deleteModal = null;
 var _deleteCid   = null;
 
 function confirmDelete(cid, nom) {
   _deleteCid = cid;
-
-  // Récupérer les usages
   fetch('/competences/' + cid + '/usage')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var exps = data.experiences || [];
-
       document.getElementById('deleteModalMsg').textContent =
         'Voulez-vous vraiment supprimer « ' + nom + ' » ?';
-
       var usagesDiv  = document.getElementById('deleteModalUsages');
       var usagesList = document.getElementById('deleteModalUsageList');
       usagesList.innerHTML = '';
-
       if (exps.length > 0) {
         exps.forEach(function(exp) {
           var li = document.createElement('li');
@@ -143,17 +242,13 @@ function confirmDelete(cid, nom) {
       } else {
         usagesDiv.style.display = 'none';
       }
-
       if (!_deleteModal) {
         _deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
       }
       _deleteModal.show();
     })
     .catch(function() {
-      // En cas d'erreur réseau, fallback simple
-      if (confirm('Supprimer cette compétence ?')) {
-        _doDelete(cid);
-      }
+      if (confirm('Supprimer cette compétence ?')) { _doDelete(cid); }
     });
 }
 
@@ -163,14 +258,10 @@ document.getElementById('deleteModalConfirmBtn').addEventListener('click', funct
 });
 
 function _doDelete(cid) {
-  var fd = new FormData();
-  fetch('/competences/' + cid + '/soft-delete', { method: 'POST', body: fd })
+  fetch('/competences/' + cid + '/soft-delete', { method: 'POST', body: new FormData() })
     .then(function(r) {
-      if (r.ok || r.redirected) {
-        window.location.href = '/competences/';
-      } else {
-        alert('Erreur lors de la suppression.');
-      }
+      if (r.ok || r.redirected) { window.location.href = '/competences/'; }
+      else { alert('Erreur lors de la suppression.'); }
     })
     .catch(function() { alert('Erreur réseau lors de la suppression.'); });
 }

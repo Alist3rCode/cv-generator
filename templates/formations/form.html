@@ -89,7 +89,59 @@
   var form = document.getElementById('mainForm');
   if (!form) return;
   {% if source_id %}
-  initAutoSave(form);
+  var GID         = '{{ gid or "" }}';
+  var STORE_KEY   = 'langDup_' + GID;
+  var HAS_TRANS   = {{ 'true' if formation else 'false' }};
+  var TEXT_FIELDS = ['diplome', 'etablissement', 'ville'];
+
+  var _stored = null;
+  if (GID && !HAS_TRANS) {
+    try { _stored = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null'); } catch(e) {}
+  }
+
+  if (_stored) {
+    // ── Mode pré-remplissage ─────────────────────────────────────────
+    TEXT_FIELDS.forEach(function(n) {
+      var el = form.querySelector('[name="' + n + '"]');
+      if (el && _stored[n] != null) el.value = _stored[n];
+    });
+
+    var banner = document.createElement('div');
+    banner.className = 'alert alert-info d-flex align-items-center justify-content-between gap-3 mb-3';
+    banner.innerHTML = '<div><i class="bi bi-translate me-2"></i>Contenu pré-rempli depuis une autre langue. Vérifiez les champs et enregistrez.</div>'
+      + '<button type="button" class="btn btn-primary btn-sm flex-shrink-0" id="globalSaveBtn">'
+      + '<i class="bi bi-floppy me-1"></i> Enregistrer cette traduction</button>';
+    form.insertBefore(banner, form.firstChild);
+
+    document.getElementById('globalSaveBtn').addEventListener('click', function() {
+      var fd = new FormData(form);
+      fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, body: fd })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function() {
+          try { sessionStorage.removeItem(STORE_KEY); } catch(e) {}
+          window.location.reload();
+        })
+        .catch(function(err) { console.warn('[PrefillSave] error:', err); });
+    });
+
+  } else {
+    // ── Mode autosave normal ──────────────────────────────────────────
+    initAutoSave(form);
+
+    if (GID) {
+      document.querySelectorAll('.lang-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var data = {};
+          TEXT_FIELDS.forEach(function(n) {
+            var el = form.querySelector('[name="' + n + '"]');
+            if (el) data[n] = el.value;
+          });
+          try { sessionStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        });
+      });
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────
   {% endif %}
   if (document.getElementById('villeInput')) {
     initLocationAutocomplete(

@@ -3,7 +3,8 @@ routers/admin.py — Pages d'administration (corbeille, utilisateurs, organisati
 """
 
 import uuid
-from fastapi import APIRouter, Depends, Form, Request, Query
+from typing import List
+from fastapi import APIRouter, Body, Depends, Form, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from sqlalchemy import or_
 from database import get_db
 from models import (
     User, Experience, Formation, Certification, Competence,
-    Organisation, UserOrganisation, RoleEnum,
+    Organisation, UserOrganisation, RoleEnum, Language,
 )
 from routers.auth import require_user
 
@@ -155,32 +156,44 @@ def admin_trash(
     if guard:
         return guard
 
-    experiences = _dedup(db.query(Experience).filter(
-        Experience.user_id == current_user.id, Experience.deleted_at != None
-    ).order_by(Experience.deleted_at.desc()).all())
+    # Récupère tous les items supprimés de tous les utilisateurs, groupés par user
+    all_users = db.query(User).order_by(User.nom, User.prenom).all()
+    user_map = {str(u.id): u for u in all_users}
 
-    formations = _dedup(db.query(Formation).filter(
-        Formation.user_id == current_user.id, Formation.deleted_at != None
-    ).order_by(Formation.deleted_at.desc()).all())
+    def _items_by_user(query_result):
+        grouped = {}
+        for item in query_result:
+            uid = str(item.user_id)
+            grouped.setdefault(uid, []).append(item)
+        return grouped
 
-    certifications = _dedup(db.query(Certification).filter(
-        Certification.user_id == current_user.id, Certification.deleted_at != None
-    ).order_by(Certification.deleted_at.desc()).all())
+    exp_by_user  = _items_by_user(_dedup(db.query(Experience).filter(
+        Experience.deleted_at != None).order_by(Experience.deleted_at.desc()).all()))
+    form_by_user = _items_by_user(_dedup(db.query(Formation).filter(
+        Formation.deleted_at != None).order_by(Formation.deleted_at.desc()).all()))
+    cert_by_user = _items_by_user(_dedup(db.query(Certification).filter(
+        Certification.deleted_at != None).order_by(Certification.deleted_at.desc()).all()))
+    comp_by_user = _items_by_user(_dedup(db.query(Competence).filter(
+        Competence.deleted_at != None).order_by(Competence.deleted_at.desc()).all()))
 
-    competences = _dedup(db.query(Competence).filter(
-        Competence.user_id == current_user.id, Competence.deleted_at != None
-    ).order_by(Competence.deleted_at.desc()).all())
+    # Liste des user_id qui ont au moins un item en corbeille
+    user_ids_with_trash = set(exp_by_user) | set(form_by_user) | set(cert_by_user) | set(comp_by_user)
+    users_with_trash = [u for u in all_users if str(u.id) in user_ids_with_trash]
 
-    tc = len(experiences) + len(formations) + len(certifications) + len(competences)
+    tc = sum(len(v) for v in exp_by_user.values()) + \
+         sum(len(v) for v in form_by_user.values()) + \
+         sum(len(v) for v in cert_by_user.values()) + \
+         sum(len(v) for v in comp_by_user.values())
 
     return templates.TemplateResponse("admin/trash.html", {
-        "request":       request,
-        "current_user":  current_user,
-        "experiences":   experiences,
-        "formations":    formations,
-        "certifications": certifications,
-        "competences":   competences,
-        "trash_count":   tc,
+        "request":           request,
+        "current_user":      current_user,
+        "users_with_trash":  users_with_trash,
+        "exp_by_user":       exp_by_user,
+        "form_by_user":      form_by_user,
+        "cert_by_user":      cert_by_user,
+        "comp_by_user":      comp_by_user,
+        "trash_count":       tc,
     })
 
 
@@ -381,6 +394,106 @@ def admin_org_remove_member(
         db.delete(uo)
         db.commit()
     return RedirectResponse(url=f"/admin/organisations/{org_id}/edit", status_code=303)
+
+
+# ── langues ────────────────────────────────────────────────────────────────
+
+@router.get("/admin/languages", response_class=HTMLResponse)
+def admin_languages(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    languages = db.query(Language).order_by(Language.sort_order, Language.nom).all()
+    return templates.TemplateResponse("admin/languages.html", {
+        "request":      request,
+        "current_user": current_user,
+        "languages":    languages,
+        "trash_count":  _trash_count(current_user.id, db),
+    })
+
+
+@router.post("/admin/languages/{lang_id}/toggle")
+def admin_language_toggle(
+    lang_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    if not _is_site_admin(current_user, db):
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+    lang = db.query(Language).filter(Language.id == uuid.UUID(lang_id)).first()
+    if not lang:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    # Le français ne peut pas être désactivé
+    if lang.code == "fr":
+        return JSONResponse({"error": "Le français ne peut pas être désactivé"}, status_code=400)
+
+    lang.is_active = not lang.is_active
+    db.commit()
+    return JSONResponse({"is_active": lang.is_active})
+
+
+@router.post("/admin/languages/new")
+def admin_language_create(
+    request: Request,
+    nom: str  = Form(...),
+    code: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    code = code.strip().lower()
+    nom  = nom.strip()
+
+    # Vérifier doublon
+    existing = db.query(Language).filter(Language.code == code).first()
+    if existing:
+        return JSONResponse({"error": f"Le code « {code} » existe déjà."}, status_code=400)
+
+    # Affecter le sort_order suivant
+    max_order = db.query(Language).count()
+    lang = Language(id=uuid.uuid4(), code=code, nom=nom, is_active=True, sort_order=max_order)
+    db.add(lang)
+    db.commit()
+
+    if request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({
+            "id":        str(lang.id),
+            "code":      lang.code,
+            "nom":       lang.nom,
+            "is_active": True,
+        })
+    return RedirectResponse(url="/admin/languages", status_code=303)
+
+
+@router.post("/admin/languages/reorder")
+def admin_language_reorder(
+    ids: List[str] = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Reçoit une liste ordonnée d'IDs et met à jour sort_order."""
+    if not _is_site_admin(current_user, db):
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+    for i, lid_str in enumerate(ids):
+        try:
+            lang = db.query(Language).filter(Language.id == uuid.UUID(lid_str)).first()
+            if lang:
+                lang.sort_order = i
+        except Exception:
+            pass
+    db.commit()
+    return JSONResponse({"ok": True})
 
 
 @router.post("/admin/organisations/{org_id}/set-role/{uo_id}")

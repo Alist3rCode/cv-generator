@@ -40,7 +40,7 @@ def list_formations(request: Request, db: Session = Depends(get_db), current_use
     formations = _dedup_by_gid(all_items)
     if not formations:
         return RedirectResponse(url="/formations/new", status_code=302)
-    languages  = db.query(Language).all()
+    languages  = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     langs_by_gid = {}
     for f in all_items:
         langs_by_gid.setdefault(str(f.gid), set()).add(str(f.language_id))
@@ -52,7 +52,7 @@ def list_formations(request: Request, db: Session = Depends(get_db), current_use
 
 @router.get("/new", response_class=HTMLResponse)
 def new_formation_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     return templates.TemplateResponse("formations/form.html", {
         "request": request, "current_user": current_user,
         "languages": languages, "formation": None, "gid": None,
@@ -96,7 +96,7 @@ def edit_formation_page(
     if not source:
         return RedirectResponse(url="/formations/", status_code=303)
 
-    languages = db.query(Language).all()
+    languages = db.query(Language).filter(Language.is_active == True).order_by(Language.sort_order, Language.nom).all()
     translations = db.query(Formation).filter(
         Formation.gid == source.gid, Formation.user_id == current_user.id
     ).all()
@@ -153,6 +153,54 @@ def update_formation(
     if request.headers.get("X-Requested-With") == "fetch":
         return JSONResponse({"ok": True})
     return RedirectResponse(url=f"/formations/{fid}/edit?language_id={language_id}", status_code=303)
+
+
+@router.get("/{fid}/content")
+def get_formation_content(
+    fid: str,
+    language_id: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Retourne le contenu textuel d'une traduction pour pré-remplissage."""
+    source = db.query(Formation).filter(
+        Formation.id == uuid.UUID(fid), Formation.user_id == current_user.id
+    ).first()
+    if not source:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    f = db.query(Formation).filter(
+        Formation.gid == source.gid,
+        Formation.user_id == current_user.id,
+        Formation.language_id == uuid.UUID(language_id),
+    ).first()
+    if not f:
+        return JSONResponse({"error": "No translation"}, status_code=404)
+    return JSONResponse({
+        "diplome":       f.diplome or "",
+        "etablissement": f.etablissement or "",
+        "ville":         f.ville or "",
+        "description":   f.description or "",
+    })
+
+
+@router.post("/{fid}/delete-translation")
+def delete_formation_translation(
+    fid: str,
+    language_id: str   = Form(...),
+    db: Session        = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    source = db.query(Formation).filter(
+        Formation.id == uuid.UUID(fid), Formation.user_id == current_user.id
+    ).first()
+    if source:
+        db.query(Formation).filter(
+            Formation.gid == source.gid,
+            Formation.user_id == current_user.id,
+            Formation.language_id == uuid.UUID(language_id),
+        ).delete()
+        db.commit()
+    return RedirectResponse(url="/formations/", status_code=303)
 
 
 @router.post("/{fid}/soft-delete")

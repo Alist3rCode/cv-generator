@@ -659,3 +659,131 @@ main.container {
   min-width: 0;
   padding: 0 0 0 1.5rem;
 }
+
+/* ── Indicateurs de traduction (liste expériences / formations / certifs) ── */
+.lang-version-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 0.71rem;
+  font-weight: 500;
+  text-decoration: none !important;
+  border: 1px solid;
+  transition: background .15s, border-color .15s, opacity .15s;
+  white-space: nowrap;
+}
+.lang-version-pill.translated {
+  border-color: rgba(25,135,84,.35);
+  color: #0f6f45;
+  background: rgba(25,135,84,.08);
+}
+[data-bs-theme="dark"] .lang-version-pill.translated {
+  border-color: rgba(25,135,84,.45);
+  color: #5cb88a;
+  background: rgba(25,135,84,.12);
+}
+.lang-version-pill.translated:hover {
+  background: rgba(25,135,84,.16);
+  border-color: rgba(25,135,84,.55);
+}
+.lang-version-pill .pill-edit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: inherit;
+  text-decoration: none;
+}
+.pill-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 3px;
+  line-height: 1;
+  font-size: .72rem;
+  color: inherit;
+  opacity: .4;
+  cursor: pointer;
+}
+.pill-remove-btn:hover { opacity: 1; color: #dc3545; }
+.lang-version-pill.missing {
+  border-color: var(--bs-border-color);
+  color: var(--bs-secondary-color);
+  background: transparent;
+  opacity: .55;
+}
+.lang-version-pill.missing:hover {
+  opacity: 1;
+  background: var(--bs-tertiary-bg);
+}
+.lang-version-pill img { flex-shrink: 0; }
+
+/* ── Compétences : filtre par langue ─────────────────────────────────────── */
+.lang-filter-btn {
+  background: var(--bs-body-bg);
+  border-color: var(--bs-border-color) !important;
+  color: var(--bs-body-color);
+  transition: background .15s, box-shadow .15s;
+}
+.lang-filter-btn:hover {
+  background: var(--bs-tertiary-bg) !important;
+}
+
+/* ── Compétences : carte avec bordure colorée gauche ─────────────────────── */
+.comp-card {
+  border-left: 3px solid transparent;
+  transition: box-shadow .15s;
+}
+.comp-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12) !important; }
+
+#hardCol .comp-card { border-left-color: #c2500f; }
+#softCol .comp-card { border-left-color: #157347; }
+
+/* Light mode: subtle column tints */
+[data-bs-theme="light"] #hardCol .comp-card,
+:root:not([data-bs-theme]) #hardCol .comp-card {
+  background: #fffaf7;
+}
+[data-bs-theme="light"] #softCol .comp-card,
+:root:not([data-bs-theme]) #softCol .comp-card {
+  background: #f7fdf9;
+}
+
+/* Light mode: section headings */
+[data-bs-theme="light"] #hardCol h5,
+:root:not([data-bs-theme]) #hardCol h5 {
+  color: #c2500f !important;
+}
+[data-bs-theme="light"] #softCol h5,
+:root:not([data-bs-theme]) #softCol h5 {
+  color: #157347 !important;
+}
+
+/* Light mode: niveau circles */
+[data-bs-theme="light"] #hardCol .bi-circle-fill,
+:root:not([data-bs-theme]) #hardCol .bi-circle-fill {
+  color: #c2500f !important;
+}
+
+/* Light mode: translation bar card */
+[data-bs-theme="light"] .lang-filter-btn,
+:root:not([data-bs-theme]) .lang-filter-btn {
+  background: #fff;
+  border-color: #dee2e6 !important;
+}
+[data-bs-theme="light"] .lang-filter-btn:hover,
+:root:not([data-bs-theme]) .lang-filter-btn:hover {
+  background: #f8f9fa !important;
+}
+
+/* Dark mode: keep original palette */
+[data-bs-theme="dark"] #hardCol .comp-card { background: inherit; }
+[data-bs-theme="dark"] #softCol .comp-card { background: inherit; }
+[data-bs-theme="dark"] #hardCol .comp-card { border-left-color: #e05c1a; }
+[data-bs-theme="dark"] #softCol .comp-card { border-left-color: #198754; }
+[data-bs-theme="dark"] #hardCol h5 { color: #e05c1a !important; }
+[data-bs-theme="dark"] #softCol h5 { color: #198754 !important; }
+[data-bs-theme="dark"] #hardCol .bi-circle-fill { color: #e05c1a !important; }
