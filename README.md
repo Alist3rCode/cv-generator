@@ -270,6 +270,7 @@ Un template de base prêt à l'emploi est téléchargeable depuis la page **Temp
 | Connexion SAML 2.0 | Authentification fédérée via SAML 2.0 (Okta, Azure AD / Microsoft Entra ID, ADFS…) |
 | Gestion de hiérarchie | Structuration en équipes / managers avec droits et visibilités associés |
 | IA multi-fournisseurs | Prise en charge d'IA maison (self-hosted) et des principaux fournisseurs du marché : OpenAI, Claude (Anthropic), Mistral, Copilot |
+| Dictionnaire de compétences | Référentiel de compétences pré-chargé à l'installation, organisé par familles (Langages de programmation, Frameworks, Méthodologies, Cloud, Outils DevOps, Soft skills…) — utilisable comme base de saisie assistée pour les utilisateurs |
 
 ## Licence
 
