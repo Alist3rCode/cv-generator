@@ -261,6 +261,15 @@ Un template de base prêt à l'emploi est téléchargeable depuis la page **Temp
 | Import IA — données existantes | Modale d'avertissement si le profil contient déjà des données (précise ce qui est remplacé vs ajouté) ; icône info orange clignotante sur chaque champ ayant une valeur en base, avec infobulle au survol |
 | Quota IA | Erreur 429 Gemini affichée avec compte à rebours automatique (délai précis extrait de la réponse Gemini) |
 
+## Roadmap
+
+| Fonctionnalité | Description |
+|---|---|
+| Connexion LDAP | Authentification via un annuaire LDAP/Active Directory d'entreprise |
+| Connexion SSO | Support OAuth2 / SAML pour une connexion unique (SSO) |
+| Gestion de hiérarchie | Structuration en équipes / managers avec droits et visibilités associés |
+| IA multi-fournisseurs | Prise en charge d'IA maison (self-hosted) et des principaux fournisseurs du marché : OpenAI, Claude (Anthropic), Mistral, Copilot |
+
 ## Licence
 
 Projet interne — tous droits réservés.
