@@ -856,7 +856,8 @@
   }
 
   /* ─── Import rapide depuis le dashboard (sessionStorage) ─────────── */
-  (function () {
+  // Doit s'exécuter après le chargement de Bootstrap (chargé après ce bloc dans base.html)
+  window.addEventListener('load', function () {
     var pending = sessionStorage.getItem('ai_import_pending');
     if (!pending) return;
     try {
@@ -887,7 +888,7 @@
     } catch (e) {
       sessionStorage.removeItem('ai_import_pending');
     }
-  })();
+  });
 
   /* ─── Traduction ──────────────────────────────────────────────────── */
   var btnTranslate  = document.getElementById('btnTranslate');
