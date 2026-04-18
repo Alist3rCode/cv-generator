@@ -1,0 +1,197 @@
+{% extends "admin/layout.html" %}
+{% block title %}Configuration IA — Administration{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4><i class="bi bi-stars text-primary"></i> Configuration IA</h4>
+</div>
+
+{% if request.query_params.get('saved') %}
+<div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
+  <i class="bi bi-check-circle-fill"></i>
+  <div>Configuration sauvegardée.</div>
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<form method="POST" action="/admin/ai-config">
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+      <i class="bi bi-cpu"></i> Fournisseur & Modèle
+    </div>
+    <div class="card-body">
+
+      <div class="mb-3">
+        <label class="form-label">Fournisseur</label>
+        <input type="text" class="form-control" value="Google Gemini" disabled />
+        <div class="form-text">Seul Gemini est supporté pour l'instant.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Modèle <span class="text-danger">*</span></label>
+        <select name="model_name" class="form-select" required>
+          {% for model in gemini_models %}
+          <option value="{{ model }}" {% if cfg and cfg.model_name == model %}selected{% elif not cfg and model == 'gemini-1.5-flash' %}selected{% endif %}>
+            {{ model }}
+          </option>
+          {% endfor %}
+        </select>
+        <div class="form-text">
+          <code>gemini-2.0-flash</code> est recommandé : rapide et économique.
+          <code>gemini-2.5-flash</code> et <code>gemini-2.5-pro</code> donnent de meilleurs résultats sur les CV complexes mais consomment plus de quota.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+      <i class="bi bi-key"></i> Clé API
+    </div>
+    <div class="card-body">
+
+      {% if has_key %}
+      <div class="alert alert-info d-flex align-items-center gap-2 mb-3 py-2">
+        <i class="bi bi-shield-lock-fill"></i>
+        <div>Une clé API est enregistrée. Laissez le champ vide pour la conserver, ou saisissez une nouvelle clé pour la remplacer.</div>
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label">
+          Clé API Gemini {% if not has_key %}<span class="text-danger">*</span>{% endif %}
+        </label>
+        <div class="input-group">
+          <input type="password" name="api_key" id="apiKeyInput"
+                 class="form-control font-monospace"
+                 placeholder="{% if has_key %}••••••••••••  (inchangée){% else %}Votre clé API Google AI Studio{% endif %}"
+                 autocomplete="off" />
+          <button type="button" class="btn btn-outline-secondary" id="btnToggleKey"
+                  title="Afficher / masquer">
+            <i class="bi bi-eye" id="eyeIcon"></i>
+          </button>
+        </div>
+        <div class="form-text">
+          Obtenez une clé sur
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+          La clé est stockée en base de données, masquée dans l'interface.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+      <i class="bi bi-toggle-on"></i> Activation
+    </div>
+    <div class="card-body">
+
+      <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" name="is_active" id="switchActive"
+               role="switch" {% if cfg and cfg.is_active %}checked{% endif %} />
+        <label class="form-check-label" for="switchActive">
+          Fonctions IA activées
+        </label>
+      </div>
+      <div class="form-text">
+        Si désactivé, les boutons IA sur la page <strong>Fonctions IA</strong> seront grisés avec un message d'information.
+      </div>
+
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-floppy"></i> Enregistrer
+    </button>
+    <a href="/admin/ai-config" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-counterclockwise"></i> Annuler
+    </a>
+  </div>
+
+</form>
+
+<!-- ── Test de connexion IA ──────────────────────────────────────────── -->
+<div class="card shadow-sm mt-4">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-wifi"></i> Test de connexion
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Envoie un prompt minimal à Gemini et affiche la réponse brute.
+      Permet de vérifier que la clé API et le modèle sont correctement configurés.
+    </p>
+    <button type="button" class="btn btn-outline-primary" id="btnTestAI" {% if not has_key %}disabled{% endif %}>
+      <i class="bi bi-send"></i> Lancer le test
+    </button>
+    {% if not has_key %}
+    <div class="form-text mt-1">Enregistrez d'abord une clé API pour pouvoir tester.</div>
+    {% endif %}
+
+    <div id="testResult" class="mt-3" style="display:none;">
+      <label class="form-label small text-muted mb-1">Réponse brute de l'API</label>
+      <pre id="testOutput" class="p-3 rounded border bg-body-secondary small mb-0"
+           style="white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ── Toggle affichage clé API ──────────────────────────────────────────
+  var input  = document.getElementById('apiKeyInput');
+  var btn    = document.getElementById('btnToggleKey');
+  var icon   = document.getElementById('eyeIcon');
+  if (btn && input) {
+    btn.addEventListener('click', function() {
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      icon.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+    });
+  }
+
+  // ── Test de connexion IA ──────────────────────────────────────────────
+  var btnTest  = document.getElementById('btnTestAI');
+  var testDiv  = document.getElementById('testResult');
+  var testOut  = document.getElementById('testOutput');
+
+  if (btnTest) {
+    btnTest.addEventListener('click', function() {
+      btnTest.disabled = true;
+      btnTest.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Test en cours…';
+      testDiv.style.display = 'none';
+      testOut.textContent = '';
+
+      fetch('/admin/ai-config/test', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fetch' },
+      })
+      .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+      .then(function(res) {
+        btnTest.disabled = false;
+        btnTest.innerHTML = '<i class="bi bi-send"></i> Lancer le test';
+        testDiv.style.display = '';
+
+        if (res.status === 200) {
+          testOut.className = 'p-3 rounded border bg-body-secondary small mb-0';
+          testOut.textContent = res.data.response;
+        } else {
+          testOut.className = 'p-3 rounded border border-danger bg-danger bg-opacity-10 text-danger small mb-0';
+          testOut.textContent = '[ERREUR ' + res.status + ']\n' + (res.data.error || JSON.stringify(res.data, null, 2));
+        }
+      })
+      .catch(function(err) {
+        btnTest.disabled = false;
+        btnTest.innerHTML = '<i class="bi bi-send"></i> Lancer le test';
+        testDiv.style.display = '';
+        testOut.className = 'p-3 rounded border border-danger bg-danger bg-opacity-10 text-danger small mb-0';
+        testOut.textContent = '[ERREUR RÉSEAU]\n' + err.message;
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

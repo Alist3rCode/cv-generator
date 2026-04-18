@@ -820,3 +820,110 @@ main.container {
 [data-bs-theme="dark"] #hardCol h5 { color: #e05c1a !important; }
 [data-bs-theme="dark"] #softCol h5 { color: #198754 !important; }
 [data-bs-theme="dark"] #hardCol .bi-circle-fill { color: #e05c1a !important; }
+
+
+/* ═══════════════════════════════════════════
+   FONCTIONS IA — Formulaire de révision
+════════════════════════════════════════════ */
+
+/* Wrapper d'un champ révision */
+.review-field-wrap { margin-bottom: .75rem; }
+
+/* Champ + boutons côte à côte */
+.review-field-inner {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+.review-field-inner .form-control,
+.review-field-inner .review-input { flex: 1; min-width: 0; }
+
+/* Boutons 💾 / ↺ */
+.review-field-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 34px;
+  flex-shrink: 0;
+}
+.rbtn-reset,
+.rbtn-confirm {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  font-size: .85rem;
+  line-height: 1;
+  transition: background .15s;
+}
+.rbtn-reset   { background: #fd7e14; color: #fff; border-radius: 0 var(--bs-border-radius) 0 0; }
+.rbtn-reset:hover   { background: #e8690a; }
+.rbtn-confirm { background: #198754; color: #fff; border-radius: 0 0 var(--bs-border-radius) 0; }
+.rbtn-confirm:hover { background: #146c43; }
+
+/* Textarea : ajuster les coins du champ pour laisser place aux boutons */
+.review-field-inner textarea.form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.review-field-inner input.form-control:not([type="hidden"]) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* Quand les boutons sont cachés, restaurer les coins */
+.review-field-wrap:not(.is-modified):not(.is-confirmed) .review-field-inner .form-control {
+  border-top-right-radius: var(--bs-border-radius) !important;
+  border-bottom-right-radius: var(--bs-border-radius) !important;
+}
+
+/* Champ modifié par l'utilisateur → bordure orange */
+.review-field-wrap.is-modified .review-input {
+  border-color: #d35400 !important;
+  box-shadow: 0 0 0 .15rem rgba(211,84,0,.2);
+}
+
+/* Champ confirmé → bordure verte */
+.review-field-wrap.is-confirmed .review-input {
+  border-color: #198754 !important;
+  box-shadow: 0 0 0 .15rem rgba(25,135,84,.2);
+}
+
+/* Étapes de progression */
+.step-pending, .step-done, .step-error {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .3rem 0;
+  font-size: .9rem;
+}
+.step-pending { color: var(--bs-body-color); opacity: .7; }
+.step-done    { color: #198754; }
+.step-error   { color: #dc3545; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin { display: inline-block; animation: spin .9s linear infinite; }
+
+/* Card compacte dans la modale (items d'expérience etc.) */
+.card-sm { font-size: .9rem; }
+.card-sm .card-header { font-size: .82rem; padding: .35rem .75rem; }
+.card-sm .card-body   { padding: .5rem .75rem; }
+
+/* ── Icône "valeur existante en DB" dans la modale de révision ──────── */
+@keyframes blink-icon {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .25; }
+}
+.ai-existing-icon {
+  color: #fd7e14;
+  font-size: .95em;
+  cursor: pointer;
+  animation: blink-icon 1.5s ease-in-out infinite;
+  vertical-align: middle;
+  margin-left: .35rem;
+}

@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(n
 logger = logging.getLogger("cv_generator")
 
 from database import init_db, SessionLocal
-from routers import auth, users, profile, experiences, formations, certifications, competences, templates, exports, admin
+from routers import auth, users, profile, experiences, formations, certifications, competences, templates, exports, admin, ai
 
 app = FastAPI(title="CV Generator", version="1.0.0")
 
@@ -146,6 +146,7 @@ app.include_router(competences.router)
 app.include_router(templates.router)
 app.include_router(exports.router)
 app.include_router(admin.router)
+app.include_router(ai.router)
 
 
 @app.on_event("startup")

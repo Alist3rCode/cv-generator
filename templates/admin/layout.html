@@ -34,6 +34,10 @@
         <span class="badge bg-danger ms-auto">{{ trash_count }}</span>
         {% endif %}
       </a>
+      <a href="/admin/ai-config"
+         class="admin-subnav-link {% if '/admin/ai-config' in request.url.path %}active{% endif %}">
+        <i class="bi bi-stars"></i> Configuration IA
+      </a>
     </nav>
   </aside>
 

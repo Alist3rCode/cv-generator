@@ -112,6 +112,14 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
 
     langue_count = db.query(ProfilLangue).filter(ProfilLangue.user_id == current_user.id).count()
 
+    # Détecter profil vide pour proposer l'import IA
+    has_data = (
+        db.query(Bio).filter(Bio.user_id == current_user.id).count() > 0
+        or db.query(Experience).filter(
+            Experience.user_id == current_user.id, Experience.deleted_at == None
+        ).count() > 0
+    )
+
     from datetime import date as _date
     return templates.TemplateResponse("profile/dashboard.html", {
         "request":        request,
@@ -128,6 +136,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
         "now_year":       _date.today().year,
         "cloud_words":    cloud_words,
         "langue_count":   langue_count,
+        "show_import_banner": not has_data,
     })
 
 

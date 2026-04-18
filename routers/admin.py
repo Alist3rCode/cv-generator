@@ -13,7 +13,7 @@ from sqlalchemy import or_
 from database import get_db
 from models import (
     User, Experience, Formation, Certification, Competence,
-    Organisation, UserOrganisation, RoleEnum, Language,
+    Organisation, UserOrganisation, RoleEnum, Language, AIConfig,
 )
 from routers.auth import require_user
 
@@ -513,3 +513,109 @@ def admin_org_set_role(
         uo.role = RoleEnum.admin if role == "admin" else RoleEnum.user
         db.commit()
     return RedirectResponse(url=f"/admin/organisations/{org_id}/edit", status_code=303)
+
+
+# ── Configuration IA ───────────────────────────────────────────────────────
+
+GEMINI_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+]
+
+
+@router.get("/admin/ai-config", response_class=HTMLResponse)
+def admin_ai_config_get(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    cfg = db.query(AIConfig).filter(AIConfig.id == 1).first()
+    return templates.TemplateResponse("admin/ai_config.html", {
+        "request":       request,
+        "current_user":  current_user,
+        "cfg":           cfg,
+        "gemini_models": GEMINI_MODELS,
+        "has_key":       bool(cfg and cfg.api_key),
+    })
+
+
+@router.post("/admin/ai-config", response_class=HTMLResponse)
+def admin_ai_config_post(
+    request: Request,
+    api_key: str   = Form(default=""),
+    model_name: str = Form(...),
+    is_active: str  = Form(default=""),
+    db: Session     = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    guard = _require_admin(current_user, db)
+    if guard:
+        return guard
+
+    cfg = db.query(AIConfig).filter(AIConfig.id == 1).first()
+    active = is_active == "on"
+
+    if cfg:
+        # Ne remplace la clé que si l'utilisateur en a saisi une nouvelle
+        if api_key.strip():
+            cfg.api_key = api_key.strip()
+        cfg.model_name = model_name
+        cfg.is_active  = active
+    else:
+        cfg = AIConfig(
+            id=1,
+            provider="gemini",
+            api_key=api_key.strip() or None,
+            model_name=model_name,
+            is_active=active,
+        )
+        db.add(cfg)
+
+    db.commit()
+    return RedirectResponse(url="/admin/ai-config?saved=1", status_code=303)
+
+
+@router.post("/admin/ai-config/test")
+def admin_ai_config_test(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Envoie un prompt de test à Gemini et retourne la réponse brute."""
+    guard = _require_admin(current_user, db)
+    if guard:
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+
+    import logging
+    logger = logging.getLogger("cv_generator.ai")
+
+    try:
+        from google import genai as _genai
+        from models import AIConfig
+
+        cfg = db.query(AIConfig).filter(AIConfig.id == 1).first()
+        api_key    = (cfg.api_key    if cfg and cfg.api_key    else "") or __import__("os").getenv("GEMINI_API_KEY", "")
+        model_name = (cfg.model_name if cfg and cfg.model_name else "") or __import__("os").getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
+
+        if not api_key:
+            return JSONResponse({"error": "Aucune clé API configurée."}, status_code=400)
+
+        client   = _genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=model_name,
+            contents='Répond moi "Salut ça gaze ?" uniquement',
+        )
+        raw = response.text
+        logger.info("Test IA OK — modèle=%s réponse=%r", model_name, raw)
+        return JSONResponse({"response": raw, "model": model_name})
+
+    except Exception as e:
+        logger.exception("Test IA échoué")
+        return JSONResponse({"error": str(e)}, status_code=500)

@@ -1,0 +1,926 @@
+{% extends "base.html" %}
+{% block title %}Fonctions IA — CV Generator{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-stars fs-4 text-primary"></i>
+  <h4 class="mb-0">Fonctions IA</h4>
+</div>
+
+{% if not ai_enabled %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <div>
+    <strong>IA non disponible</strong> — {{ ai_disabled_reason }}
+    {% if request.state.is_admin %}
+    <a href="/admin/ai-config" class="alert-link ms-1">Configurer l'IA</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+  <!-- ══════════════════════════════════════════════════════
+       Carte 1 — Import CV
+  ══════════════════════════════════════════════════════ -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-cloud-upload text-primary"></i> Importer un CV
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Uploadez un fichier PDF ou DOCX — Gemini extrait automatiquement toutes vos informations
+          (expériences, formations, compétences…) et les place dans un formulaire de révision.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label">Langue du formulaire <span class="text-danger">*</span></label>
+          <select class="form-select" id="importLanguageId" {% if not ai_enabled %}disabled{% endif %}>
+            {% for lang in languages %}
+            <option value="{{ lang.id }}">
+              {{ lang.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Fichier CV <span class="text-danger">*</span></label>
+          <input type="file" class="form-control" id="importFile"
+                 accept=".pdf,.docx"
+                 {% if not ai_enabled %}disabled{% endif %} />
+          <div class="form-text">Formats acceptés : PDF, DOCX</div>
+        </div>
+
+        <!-- Alerte d'erreur import -->
+        <div id="importError" class="alert mb-3" style="display:none;"></div>
+
+        <!-- Étapes de progression import -->
+        <div id="importProgress" class="mb-3" style="display:none;">
+          <ul class="list-unstyled mb-0" id="importProgressList"></ul>
+        </div>
+
+        <button type="button" class="btn btn-primary w-100" id="btnImport"
+                {% if not ai_enabled %}disabled{% endif %}>
+          <i class="bi bi-stars"></i> Analyser avec Gemini
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       Carte 2 — Traduction
+  ══════════════════════════════════════════════════════ -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-translate text-success"></i> Traduire mon CV
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Sélectionnez les rubriques à traduire, la langue source et la langue cible.
+          Gemini traduit le contenu en conservant les noms propres d'entreprises.
+        </p>
+
+        <label class="form-label fw-semibold">Rubriques à traduire</label>
+        <div class="d-flex flex-wrap gap-3 mb-3">
+          {% set sections = [
+            ("bio",          "bi-chat-left-text", "Bio"),
+            ("experiences",  "bi-briefcase",      "Expériences"),
+            ("formations",   "bi-mortarboard",    "Formations"),
+            ("certifications","bi-patch-check",   "Certifications"),
+            ("competences",  "bi-stars",          "Compétences"),
+          ] %}
+          {% for val, icon, label in sections %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="{{ val }}"
+                   id="type_{{ val }}" name="types"
+                   {% if not ai_enabled %}disabled{% endif %} />
+            <label class="form-check-label" for="type_{{ val }}">
+              <i class="bi {{ icon }}"></i> {{ label }}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Langue source <span class="text-danger">*</span></label>
+            <select class="form-select" id="translateFromId"
+                    {% if not ai_enabled %}disabled{% endif %}>
+              {% for lang in languages %}
+              <option value="{{ lang.id }}">{{ lang.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Langue cible <span class="text-danger">*</span></label>
+            <select class="form-select" id="translateToId"
+                    {% if not ai_enabled %}disabled{% endif %}>
+              {% for lang in languages %}
+              <option value="{{ lang.id }}">{{ lang.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Alerte d'erreur traduction -->
+        <div id="translateError" class="alert mb-3" style="display:none;"></div>
+
+        <!-- Étapes de progression traduction -->
+        <div id="translateProgress" class="mb-3" style="display:none;">
+          <ul class="list-unstyled mb-0" id="translateProgressList"></ul>
+        </div>
+
+        <button type="button" class="btn btn-success w-100" id="btnTranslate"
+                {% if not ai_enabled %}disabled{% endif %}>
+          <i class="bi bi-stars"></i> Traduire avec Gemini
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /row -->
+
+
+<!-- ══════════════════════════════════════════════════════
+     Modale d'avertissement — données existantes
+══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="overwriteWarningModal" tabindex="-1" aria-labelledby="overwriteWarningTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-warning">
+        <h5 class="modal-title text-warning" id="overwriteWarningTitle">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>Données existantes détectées
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Votre profil contient déjà des données. Voici ce qui se passera lors de la validation :</p>
+        <ul class="mb-3">
+          <li><strong>Profil, Bio et Langues parlées</strong> — seront <span class="text-danger fw-semibold">remplacés</span> par les valeurs extraites du CV.</li>
+          <li><strong>Expériences, Formations et Certifications</strong> — les nouvelles entrées seront <span class="text-success fw-semibold">ajoutées</span> sans supprimer les existantes.</li>
+          <li><strong>Compétences</strong> — les nouvelles compétences seront <span class="text-success fw-semibold">ajoutées</span> (les doublons sont ignorés).</li>
+        </ul>
+        <p class="text-muted small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          Les champs portant une icône <span class="ai-existing-icon" style="animation:none;"><i class="bi bi-info-circle-fill"></i></span> indiquent la valeur actuellement en base au survol.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> Annuler
+        </button>
+        <button type="button" class="btn btn-warning" id="btnConfirmOverwrite">
+          <i class="bi bi-arrow-right-circle"></i> Continuer quand même
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     Modale de révision partagée
+══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-labelledby="reviewModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title" id="reviewModalTitle">
+          <i class="bi bi-stars text-primary"></i> Révision — <span id="reviewModalSubtitle"></span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body" id="reviewModalBody">
+        <!-- Contenu généré dynamiquement par JS -->
+      </div>
+
+      <div class="modal-footer d-flex justify-content-between align-items-center">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> Annuler
+        </button>
+        <div class="d-flex align-items-center gap-3">
+          <span class="text-muted small" id="reviewCountLabel"></span>
+          <button type="button" class="btn btn-success px-4" id="btnValidate">
+            <i class="bi bi-floppy"></i> <span id="btnValidateLabel">Valider et importer</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Formulaire caché pour la soumission finale -->
+<form id="reviewForm" method="POST" style="display:none;">
+  <input type="hidden" name="data" id="reviewFormData" />
+  <input type="hidden" name="language_id" id="reviewFormLangId" />
+  <input type="hidden" name="language_to_id" id="reviewFormLangToId" />
+</form>
+
+
+<script>
+(function() {
+  'use strict';
+
+  /* ─── Constantes ──────────────────────────────────────────────────── */
+  var CEFR_LABELS = {
+    'A1':'A1 — Débutant','A2':'A2 — Élémentaire',
+    'B1':'B1 — Intermédiaire','B2':'B2 — Intermédiaire avancé',
+    'C1':'C1 — Autonome','C2':'C2 — Maîtrise','NATIVE':'Langue maternelle'
+  };
+
+  /* ─── Utilitaires DOM ─────────────────────────────────────────────── */
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  /* ─── Étapes de progression ───────────────────────────────────────── */
+  var IMPORT_STEPS = [
+    { delay: 0,    text: 'Envoi du fichier vers Gemini…' },
+    { delay: 2000, text: 'Analyse IA du CV en cours…' },
+    { delay: 6000, text: 'Extraction des données structurées…' },
+  ];
+  var TRANSLATE_STEPS = [
+    { delay: 0,    text: 'Préparation du contenu à traduire…' },
+    { delay: 1500, text: 'Traduction IA en cours…' },
+    { delay: 5000, text: 'Finalisation de la traduction…' },
+  ];
+
+  var _progressTimers = [];
+
+  function startProgress(listEl, wrapEl, steps) {
+    wrapEl.style.display = '';
+    listEl.innerHTML = '';
+    _progressTimers.forEach(clearTimeout);
+    _progressTimers = [];
+    steps.forEach(function(step, i) {
+      var li = document.createElement('li');
+      li.className = 'step-pending';
+      li.innerHTML = '<i class="bi bi-hourglass-split spin me-2"></i>' + esc(step.text);
+      li.style.display = 'none';
+      listEl.appendChild(li);
+      var t = setTimeout(function() {
+        li.style.display = '';
+        // Marquer le précédent comme done
+        if (i > 0) {
+          var prev = listEl.children[i-1];
+          if (prev) {
+            prev.className = 'step-done';
+            prev.querySelector('i').className = 'bi bi-check-circle-fill me-2';
+          }
+        }
+      }, step.delay);
+      _progressTimers.push(t);
+    });
+  }
+
+  function stopProgress(listEl, wrapEl, success) {
+    _progressTimers.forEach(clearTimeout);
+    _progressTimers = [];
+    var items = listEl.querySelectorAll('li');
+    items.forEach(function(li) {
+      if (li.style.display === 'none') return;
+      li.className = success ? 'step-done' : 'step-error';
+      var ico = li.querySelector('i');
+      if (ico) ico.className = success ? 'bi bi-check-circle-fill me-2' : 'bi bi-x-circle-fill me-2';
+    });
+    if (!success) {
+      setTimeout(function() { wrapEl.style.display = 'none'; }, 2000);
+    }
+  }
+
+  /* ─── Affichage des erreurs avec gestion 429 ──────────────────────── */
+  function showError(el, resp, defaultMsg) {
+    el.style.display = '';
+    var msg = (resp && resp.error) ? resp.error : (defaultMsg || 'Erreur inconnue.');
+    var isRateLimit = resp && (resp.rate_limited || resp.status === 429);
+    if (isRateLimit) {
+      el.className = 'alert alert-warning mb-3';
+      var retryMsg = '';
+      if (resp.retry_after) {
+        retryMsg = ' Réessayez dans <strong>' + resp.retry_after + ' secondes</strong>.';
+        // Compte à rebours automatique
+        _startCountdown(el, resp.retry_after, msg);
+        return;
+      }
+      el.innerHTML = '<i class="bi bi-clock-history me-2"></i><strong>Quota Gemini dépassé.</strong> ' + esc(msg) + retryMsg;
+    } else {
+      el.className = 'alert alert-danger mb-3';
+      el.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + esc(msg);
+    }
+  }
+
+  function _startCountdown(el, seconds, baseMsg) {
+    var remaining = parseInt(seconds, 10);
+    function tick() {
+      el.innerHTML = '<i class="bi bi-clock-history me-2"></i>'
+        + '<strong>Quota Gemini dépassé.</strong> '
+        + esc(baseMsg.replace(/\.\s*$/, '')) + '.'
+        + ' Réessayez dans <strong>' + remaining + ' secondes</strong>.';
+      if (remaining > 0) {
+        remaining--;
+        setTimeout(tick, 1000);
+      } else {
+        el.innerHTML = '<i class="bi bi-check-circle me-2"></i>Vous pouvez réessayer maintenant.';
+        el.className = 'alert alert-success mb-3';
+      }
+    }
+    tick();
+  }
+
+  /* ─── Construction de la modale ───────────────────────────────────── */
+  function buildReviewModal(data, mode, langId, existing) {
+    existing = existing || {};
+    var body = document.getElementById('reviewModalBody');
+    body.innerHTML = '';
+
+    var sections = [];
+
+    // ── Profil (import uniquement) ────────────────────────────────────
+    if (mode === 'import' && data.profile) {
+      var p = data.profile;
+      var ep = existing.profile || {};
+      sections.push({
+        id: 'secProfile', icon: 'bi-person', title: 'Profil',
+        html: buildFields([
+          { label: 'Titre / Poste',   key: 'profile.poste',        val: p.poste        || '', existingVal: ep.poste        || '' },
+          { label: 'Téléphone',       key: 'profile.telephone',    val: p.telephone    || '', existingVal: ep.telephone    || '' },
+          { label: 'LinkedIn',        key: 'profile.linkedin_url', val: p.linkedin_url || '', existingVal: ep.linkedin_url || '' },
+        ])
+      });
+    }
+
+    // ── Bio ───────────────────────────────────────────────────────────
+    if (data.bio && (data.bio.texte || data.bio.poste)) {
+      var b = data.bio;
+      var eb = existing.bio || {};
+      var bioFields = [];
+      if (mode === 'translate' && b.poste !== undefined) {
+        bioFields.push({ label: 'Titre traduit', key: 'bio.poste', val: b.poste || '' });
+      }
+      if (b.texte !== undefined) {
+        bioFields.push({ label: 'Présentation', key: 'bio.texte', val: b.texte || '', textarea: true, existingVal: eb.texte || '' });
+      }
+      if (bioFields.length) {
+        sections.push({ id: 'secBio', icon: 'bi-chat-left-text', title: 'Bio / Présentation', html: buildFields(bioFields) });
+      }
+    }
+
+    // ── Langues parlées (import uniquement) ───────────────────────────
+    if (mode === 'import' && data.profil_langues && data.profil_langues.length) {
+      var languesHtml = '';
+      if (existing.profil_langues && existing.profil_langues.length) {
+        var existingLangList = existing.profil_langues.map(function(l) { return l.nom + ' (' + l.niveau + ')'; }).join(', ');
+        languesHtml += '<div class="alert alert-warning py-2 small mb-3">'
+          + '<i class="bi bi-exclamation-triangle me-1"></i>'
+          + '<strong>Remplacement :</strong> vos langues actuelles (' + esc(existingLangList) + ') seront remplacées par celles-ci.'
+          + '</div>';
+      }
+      languesHtml += buildLangues(data.profil_langues);
+      sections.push({
+        id: 'secLangues', icon: 'bi-translate', title: 'Langues parlées',
+        html: languesHtml
+      });
+    }
+
+    // ── Expériences ───────────────────────────────────────────────────
+    if (data.experiences && data.experiences.length) {
+      sections.push({
+        id: 'secExp', icon: 'bi-briefcase', title: 'Expériences (' + data.experiences.length + ')',
+        html: buildExperiences(data.experiences, mode)
+      });
+    }
+
+    // ── Formations ────────────────────────────────────────────────────
+    if (data.formations && data.formations.length) {
+      sections.push({
+        id: 'secForm', icon: 'bi-mortarboard', title: 'Formations (' + data.formations.length + ')',
+        html: buildFormations(data.formations, mode)
+      });
+    }
+
+    // ── Certifications ────────────────────────────────────────────────
+    if (data.certifications && data.certifications.length) {
+      sections.push({
+        id: 'secCert', icon: 'bi-patch-check', title: 'Certifications (' + data.certifications.length + ')',
+        html: buildCertifications(data.certifications, mode)
+      });
+    }
+
+    // ── Compétences (import) ──────────────────────────────────────────
+    if (mode === 'import' && data.competences) {
+      var hard = (data.competences.hard || []);
+      var soft = (data.competences.soft || []);
+      if (hard.length) {
+        sections.push({
+          id: 'secHard', icon: 'bi-stars', title: 'Hard Skills (' + hard.length + ')',
+          html: buildCompetences(hard, 'hard')
+        });
+      }
+      if (soft.length) {
+        sections.push({
+          id: 'secSoft', icon: 'bi-emoji-smile', title: 'Soft Skills (' + soft.length + ')',
+          html: buildCompetences(soft, 'soft')
+        });
+      }
+    }
+
+    // ── Compétences (traduction) ──────────────────────────────────────
+    if (mode === 'translate' && data.competences && data.competences.length) {
+      sections.push({
+        id: 'secComps', icon: 'bi-stars', title: 'Compétences (' + data.competences.length + ')',
+        html: buildCompetencesTrad(data.competences)
+      });
+    }
+
+    // Assembler l'accordion
+    var accordion = '<div class="accordion" id="reviewAccordion">';
+    sections.forEach(function(sec, i) {
+      var open = i === 0 ? 'show' : '';
+      var collapsed = i === 0 ? '' : 'collapsed';
+      accordion += [
+        '<div class="accordion-item">',
+        '  <h2 class="accordion-header">',
+        '    <button class="accordion-button ' + collapsed + '" type="button"',
+        '            data-bs-toggle="collapse" data-bs-target="#' + sec.id + '">',
+        '      <i class="bi ' + sec.icon + ' me-2"></i>' + esc(sec.title),
+        '    </button>',
+        '  </h2>',
+        '  <div id="' + sec.id + '" class="accordion-collapse collapse ' + open + '"',
+        '       data-bs-parent="#reviewAccordion">',
+        '    <div class="accordion-body">' + sec.html + '</div>',
+        '  </div>',
+        '</div>',
+      ].join('');
+    });
+    accordion += '</div>';
+
+    body.innerHTML = accordion;
+    attachFieldHandlers(body);
+
+    // Initialiser les tooltips Bootstrap pour les icônes "valeur existante"
+    body.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+      new bootstrap.Tooltip(el, { html: false });
+    });
+
+    // Compter les éléments
+    var count = 0;
+    if (data.experiences)  count += data.experiences.length;
+    if (data.formations)   count += data.formations.length;
+    if (data.certifications) count += data.certifications.length;
+    if (data.bio && data.bio.texte) count += 1;
+    if (mode === 'import') {
+      if (data.profil_langues) count += data.profil_langues.length;
+      if (data.competences) {
+        count += (data.competences.hard || []).length;
+        count += (data.competences.soft || []).length;
+      }
+    }
+    if (mode === 'translate' && data.competences) count += data.competences.length;
+
+    var label = mode === 'import'
+      ? 'Valider et importer ' + count + ' élément' + (count > 1 ? 's' : '')
+      : 'Valider et sauvegarder les traductions';
+    document.getElementById('btnValidateLabel').textContent = label;
+    document.getElementById('reviewCountLabel').textContent = count + ' élément' + (count > 1 ? 's' : '') + ' à importer';
+    document.getElementById('reviewModalSubtitle').textContent = mode === 'import' ? 'Import CV' : 'Traduction';
+    document.getElementById('reviewFormLangId').value   = langId;
+    document.getElementById('reviewFormLangToId').value = langId;
+
+    var form  = document.getElementById('reviewForm');
+    form.action = mode === 'import' ? '/ai/import/save' : '/ai/translate/save';
+
+    // Mémoriser le mode pour la soumission
+    document.getElementById('btnValidate').dataset.mode = mode;
+  }
+
+  /* ─── Constructeurs de sections ────────────────────────────────────── */
+
+  function buildFields(fields) {
+    return fields.map(function(f) {
+      return reviewField(f.key, f.label, f.val, f.textarea || false, f.existingVal || '');
+    }).join('');
+  }
+
+  function reviewField(key, label, val, textarea, existingVal) {
+    var inputHtml;
+    var safeVal = esc(val);
+    if (textarea) {
+      inputHtml = '<textarea class="form-control review-input" rows="4" data-key="' + esc(key) + '">' + safeVal + '</textarea>';
+    } else {
+      inputHtml = '<input type="text" class="form-control review-input" value="' + safeVal + '" data-key="' + esc(key) + '" />';
+    }
+
+    // Icône "valeur existante en DB" si une valeur est présente
+    var existingIconHtml = '';
+    if (existingVal) {
+      var tooltipText = 'Valeur actuelle en base : ' + existingVal;
+      existingIconHtml = ' <i class="bi bi-info-circle-fill ai-existing-icon"'
+        + ' data-bs-toggle="tooltip" data-bs-placement="top"'
+        + ' title="' + esc(tooltipText) + '"></i>';
+    }
+
+    return [
+      '<div class="mb-3 review-field-wrap" data-original="' + safeVal + '">',
+      '  <label class="form-label small text-muted mb-1">' + esc(label) + existingIconHtml + '</label>',
+      '  <div class="review-field-inner">',
+      '    ' + inputHtml,
+      '    <div class="review-field-btns" style="display:none;">',
+      '      <button type="button" class="rbtn-reset" title="Restaurer la valeur IA"><i class="bi bi-arrow-counterclockwise"></i></button>',
+      '      <button type="button" class="rbtn-confirm" title="Marquer comme vérifié"><i class="bi bi-check-lg"></i></button>',
+      '    </div>',
+      '  </div>',
+      '</div>',
+    ].join('');
+  }
+
+  function buildLangues(langues) {
+    return langues.map(function(l, i) {
+      var nom = l.nom || '';
+      var niv = l.niveau || 'B2';
+      var cefrLabel = CEFR_LABELS[niv] || niv;
+      return [
+        '<div class="row g-2 mb-2 align-items-end review-langue-row" data-idx="' + i + '">',
+        '  <div class="col-6">',
+        '    <label class="form-label small text-muted mb-1">Langue</label>',
+        '    <input type="text" class="form-control review-input" value="' + esc(nom) + '" data-key="profil_langues[' + i + '].nom" />',
+        '  </div>',
+        '  <div class="col-6">',
+        '    <label class="form-label small text-muted mb-1">Niveau CEFR</label>',
+        '    <select class="form-select review-input" data-key="profil_langues[' + i + '].niveau">',
+        '      ' + Object.entries(CEFR_LABELS).map(function(e) {
+          return '<option value="' + e[0] + '"' + (e[0] === niv ? ' selected' : '') + '>' + esc(e[1]) + '</option>';
+        }).join(''),
+        '    </select>',
+        '  </div>',
+        '</div>',
+      ].join('');
+    }).join('');
+  }
+
+  function buildExperiences(exps, mode) {
+    return exps.map(function(exp, i) {
+      var pfx = 'experiences[' + i + ']';
+      var gid  = exp._gid || '';
+      var fields = [
+        { label: 'Titre du poste',   key: pfx + '.titre_poste',    val: exp.titre_poste    || '' },
+        { label: 'Entreprise',       key: pfx + '.entreprise',     val: exp.entreprise     || '' },
+        { label: 'Lieu',             key: pfx + '.location',       val: exp.location       || '' },
+      ];
+      if (mode === 'import') {
+        fields.push({ label: 'Début (YYYY-MM-DD)',  key: pfx + '.date_debut', val: exp.date_debut || '' });
+        fields.push({ label: 'Fin (YYYY-MM-DD)',    key: pfx + '.date_fin',   val: exp.date_fin   || '' });
+      }
+      fields.push({ label: 'Résumé du projet', key: pfx + '.project_summary', val: exp.project_summary || '', textarea: true });
+      fields.push({ label: 'Description',      key: pfx + '.description',     val: exp.description     || '', textarea: true });
+
+      var title = (exp.titre_poste || 'Expérience ' + (i+1));
+      if (exp.entreprise) title += ' — ' + exp.entreprise;
+      return itemCard(title, gid, fields, i);
+    }).join('');
+  }
+
+  function buildFormations(forms, mode) {
+    return forms.map(function(f, i) {
+      var pfx = 'formations[' + i + ']';
+      var gid  = f._gid || '';
+      var fields = [
+        { label: 'Diplôme',         key: pfx + '.diplome',        val: f.diplome       || '' },
+        { label: 'Établissement',   key: pfx + '.etablissement',  val: f.etablissement || '' },
+        { label: 'Ville',           key: pfx + '.ville',          val: f.ville         || '' },
+      ];
+      if (mode === 'import') {
+        fields.push({ label: 'Début (YYYY-MM-DD)', key: pfx + '.date_debut', val: f.date_debut || '' });
+        fields.push({ label: 'Fin (YYYY-MM-DD)',   key: pfx + '.date_fin',   val: f.date_fin   || '' });
+      }
+      var title = f.diplome || ('Formation ' + (i+1));
+      return itemCard(title, gid, fields, i);
+    }).join('');
+  }
+
+  function buildCertifications(certs, mode) {
+    return certs.map(function(c, i) {
+      var pfx = 'certifications[' + i + ']';
+      var gid  = c._gid || '';
+      var fields = [
+        { label: 'Titre',      key: pfx + '.titre',    val: c.titre    || '' },
+        { label: 'Organisme', key: pfx + '.organisme', val: c.organisme || '' },
+      ];
+      if (mode === 'import') {
+        fields.push({ label: 'Date d\'obtention (YYYY-MM-DD)', key: pfx + '.date_obtention', val: c.date_obtention || '' });
+        fields.push({ label: 'Date d\'expiration (YYYY-MM-DD)', key: pfx + '.date_fin', val: c.date_fin || '' });
+      }
+      var title = c.titre || ('Certification ' + (i+1));
+      return itemCard(title, gid, fields, i);
+    }).join('');
+  }
+
+  function buildCompetences(comps, skillType) {
+    var note = skillType === 'hard'
+      ? '<div class="alert alert-info py-2 small mb-3"><i class="bi bi-info-circle me-1"></i>Niveau initial : Débutant. Modifiez-le depuis la page Compétences après l\'import.</div>'
+      : '';
+    var html = note + comps.map(function(c, i) {
+      var pfx = 'competences.' + skillType + '[' + i + ']';
+      return [
+        '<div class="row g-2 mb-2 align-items-end">',
+        '  <div class="col-7">',
+        '    <label class="form-label small text-muted mb-1">Nom</label>',
+        '    <input type="text" class="form-control review-input" value="' + esc(c.nom || '') + '" data-key="' + esc(pfx) + '.nom" />',
+        '  </div>',
+        '  <div class="col-5">',
+        '    <label class="form-label small text-muted mb-1">Famille</label>',
+        '    <input type="text" class="form-control review-input" value="' + esc(c.famille || '') + '" data-key="' + esc(pfx) + '.famille" />',
+        '  </div>',
+        '</div>',
+      ].join('');
+    }).join('');
+    return html;
+  }
+
+  function buildCompetencesTrad(comps) {
+    return comps.map(function(c, i) {
+      var pfx = 'competences[' + i + ']';
+      var gid  = c._gid || '';
+      var fields = [
+        { label: 'Nom',     key: pfx + '.nom',     val: c.nom     || '' },
+        { label: 'Famille', key: pfx + '.famille', val: c.famille || '' },
+      ];
+      // Conserver les métadonnées cachées
+      var meta = '';
+      if (gid) meta += '<input type="hidden" data-key="' + esc(pfx) + '._gid" value="' + esc(gid) + '" />';
+      if (c._type)   meta += '<input type="hidden" data-key="' + esc(pfx) + '._type" value="' + esc(c._type) + '" />';
+      if (c._niveau) meta += '<input type="hidden" data-key="' + esc(pfx) + '._niveau" value="' + esc(c._niveau) + '" />';
+      var title = c.nom || ('Compétence ' + (i+1));
+      return itemCard(title, gid, fields, i, meta);
+    }).join('');
+  }
+
+  function itemCard(title, gid, fields, idx, extraHtml) {
+    var hiddenGid = gid ? '<input type="hidden" data-key="' + esc('_gid_' + idx) + '" value="' + esc(gid) + '" />' : '';
+    return [
+      '<div class="card card-sm mb-3">',
+      '  <div class="card-header py-2 small fw-semibold text-muted">' + esc(title) + '</div>',
+      '  <div class="card-body py-2">',
+      hiddenGid,
+      (extraHtml || ''),
+      buildFields(fields),
+      '  </div>',
+      '</div>',
+    ].join('');
+  }
+
+  /* ─── Gestion des champs (💾 / ↺) ────────────────────────────────── */
+  function attachFieldHandlers(container) {
+    container.querySelectorAll('.review-field-wrap').forEach(function(wrap) {
+      var input = wrap.querySelector('.review-input');
+      if (!input) return;
+      var btns  = wrap.querySelector('.review-field-btns');
+      var original = wrap.dataset.original || '';
+
+      function onInput() {
+        var changed = input.value !== original;
+        wrap.classList.toggle('is-modified', changed);
+        if (btns) btns.style.display = changed ? '' : 'none';
+      }
+
+      input.addEventListener('input', onInput);
+      input.addEventListener('change', onInput);
+
+      var btnReset = wrap.querySelector('.rbtn-reset');
+      if (btnReset) {
+        btnReset.addEventListener('click', function() {
+          input.value = original;
+          wrap.classList.remove('is-modified', 'is-confirmed');
+          if (btns) btns.style.display = 'none';
+        });
+      }
+
+      var btnConfirm = wrap.querySelector('.rbtn-confirm');
+      if (btnConfirm) {
+        btnConfirm.addEventListener('click', function() {
+          wrap.classList.remove('is-modified');
+          wrap.classList.add('is-confirmed');
+          if (btns) btns.style.display = 'none';
+        });
+      }
+    });
+  }
+
+  /* ─── Collecte des données du formulaire ──────────────────────────── */
+  function collectReviewFormData(mode) {
+    var result = {};
+    var body = document.getElementById('reviewModalBody');
+
+    body.querySelectorAll('[data-key]').forEach(function(el) {
+      var key = el.dataset.key;
+      var val = (el.tagName === 'SELECT') ? el.value : el.value;
+      _setDeep(result, key, val);
+    });
+
+    return result;
+  }
+
+  function _setDeep(obj, path, val) {
+    // Gère: "profile.telephone", "experiences[0].titre_poste", "competences.hard[0].nom"
+    var parts = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+    var cur = obj;
+    for (var i = 0; i < parts.length - 1; i++) {
+      var p = parts[i];
+      var nextP = parts[i+1];
+      var isNextIndex = /^\d+$/.test(nextP);
+      if (cur[p] === undefined) {
+        cur[p] = isNextIndex ? [] : {};
+      }
+      // Promotion array → object si nécessaire
+      if (isNextIndex && !Array.isArray(cur[p])) cur[p] = [];
+      cur = cur[p];
+    }
+    var last = parts[parts.length - 1];
+    if (Array.isArray(cur)) {
+      cur[parseInt(last, 10)] = val;
+    } else {
+      cur[last] = val;
+    }
+  }
+
+  /* ─── Bouton Valider ──────────────────────────────────────────────── */
+  document.getElementById('btnValidate').addEventListener('click', function() {
+    var mode = this.dataset.mode || 'import';
+    var data = collectReviewFormData(mode);
+    document.getElementById('reviewFormData').value = JSON.stringify(data);
+
+    var form = document.getElementById('reviewForm');
+    if (mode === 'import') {
+      form.action = '/ai/import/save';
+    } else {
+      form.action = '/ai/translate/save';
+      // Pour translate/save, le champ doit être language_to_id
+      document.getElementById('reviewFormLangToId').value = document.getElementById('reviewFormLangId').value;
+    }
+    form.submit();
+  });
+
+  /* ─── Import CV ───────────────────────────────────────────────────── */
+  var btnImport    = document.getElementById('btnImport');
+  var importErr    = document.getElementById('importError');
+  var importProg   = document.getElementById('importProgress');
+  var importList   = document.getElementById('importProgressList');
+
+  if (btnImport) {
+    btnImport.addEventListener('click', function() {
+      var langId = document.getElementById('importLanguageId').value;
+      var file   = document.getElementById('importFile').files[0];
+
+      importErr.style.display = 'none';
+      importErr.className = 'alert mb-3';
+
+      if (!file) {
+        importErr.className = 'alert alert-warning mb-3';
+        importErr.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Veuillez sélectionner un fichier PDF ou DOCX.';
+        importErr.style.display = '';
+        return;
+      }
+      if (!langId) {
+        importErr.className = 'alert alert-warning mb-3';
+        importErr.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Veuillez sélectionner une langue.';
+        importErr.style.display = '';
+        return;
+      }
+
+      btnImport.disabled = true;
+      startProgress(importList, importProg, IMPORT_STEPS);
+
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('language_id', langId);
+
+      fetch('/ai/import/preview', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fetch' },
+        body: fd,
+      })
+      .then(function(r) {
+        return r.json().then(function(d) { return { status: r.status, data: d }; });
+      })
+      .then(function(res) {
+        stopProgress(importList, importProg, res.status === 200);
+        btnImport.disabled = false;
+
+        if (res.status !== 200) {
+          showError(importErr, Object.assign(res.data, { status: res.status }), 'Erreur lors de l\'analyse.');
+          return;
+        }
+
+        var _pendingData     = res.data.data;
+        var _pendingLangId   = res.data.language_id;
+        var _pendingExisting = res.data.existing || {};
+
+        function openReviewModal() {
+          buildReviewModal(_pendingData, 'import', _pendingLangId, _pendingExisting);
+          bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal')).show();
+        }
+
+        if (res.data.has_existing) {
+          // Afficher la modale d'avertissement d'abord
+          var warnModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('overwriteWarningModal'));
+          var btnConfirm = document.getElementById('btnConfirmOverwrite');
+          // Remplacer le listener pour éviter les doublons
+          var newBtn = btnConfirm.cloneNode(true);
+          btnConfirm.parentNode.replaceChild(newBtn, btnConfirm);
+          newBtn.addEventListener('click', function() {
+            warnModal.hide();
+            // Attendre la fermeture de la modale d'avertissement avant d'ouvrir la modale de révision
+            document.getElementById('overwriteWarningModal').addEventListener('hidden.bs.modal', function handler() {
+              document.getElementById('overwriteWarningModal').removeEventListener('hidden.bs.modal', handler);
+              openReviewModal();
+            });
+          });
+          warnModal.show();
+        } else {
+          openReviewModal();
+        }
+      })
+      .catch(function(err) {
+        stopProgress(importList, importProg, false);
+        btnImport.disabled = false;
+        showError(importErr, null, 'Erreur réseau : ' + err.message);
+      });
+    });
+  }
+
+  /* ─── Traduction ──────────────────────────────────────────────────── */
+  var btnTranslate  = document.getElementById('btnTranslate');
+  var translateErr  = document.getElementById('translateError');
+  var translateProg = document.getElementById('translateProgress');
+  var translateList = document.getElementById('translateProgressList');
+
+  if (btnTranslate) {
+    btnTranslate.addEventListener('click', function() {
+      var fromId  = document.getElementById('translateFromId').value;
+      var toId    = document.getElementById('translateToId').value;
+      var checked = Array.from(document.querySelectorAll('input[name="types"]:checked'))
+                        .map(function(cb) { return cb.value; });
+
+      translateErr.style.display = 'none';
+      translateErr.className = 'alert mb-3';
+
+      if (!checked.length) {
+        translateErr.className = 'alert alert-warning mb-3';
+        translateErr.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Sélectionnez au moins une rubrique à traduire.';
+        translateErr.style.display = '';
+        return;
+      }
+      if (fromId === toId) {
+        translateErr.className = 'alert alert-warning mb-3';
+        translateErr.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>La langue source et la langue cible doivent être différentes.';
+        translateErr.style.display = '';
+        return;
+      }
+
+      btnTranslate.disabled = true;
+      startProgress(translateList, translateProg, TRANSLATE_STEPS);
+
+      var fd = new FormData();
+      fd.append('language_from_id', fromId);
+      fd.append('language_to_id', toId);
+      checked.forEach(function(t) { fd.append('types', t); });
+
+      fetch('/ai/translate/preview', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fetch' },
+        body: fd,
+      })
+      .then(function(r) {
+        return r.json().then(function(d) { return { status: r.status, data: d }; });
+      })
+      .then(function(res) {
+        stopProgress(translateList, translateProg, res.status === 200);
+        btnTranslate.disabled = false;
+
+        if (res.status !== 200) {
+          showError(translateErr, Object.assign(res.data, { status: res.status }), 'Erreur lors de la traduction.');
+          return;
+        }
+
+        var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal'));
+        buildReviewModal(res.data.data, 'translate', res.data.language_to_id);
+        modal.show();
+      })
+      .catch(function(err) {
+        stopProgress(translateList, translateProg, false);
+        btnTranslate.disabled = false;
+        showError(translateErr, null, 'Erreur réseau : ' + err.message);
+      });
+    });
+  }
+
+})();
+</script>
+{% endblock %}

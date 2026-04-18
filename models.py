@@ -387,3 +387,24 @@ class CVExport(AuditMixin, Base):
     user     = relationship("User",     back_populates="cv_exports", foreign_keys=[user_id])
     template = relationship("Template", back_populates="cv_exports")
     language = relationship("Language", back_populates="cv_exports")
+
+
+# ──────────────────────────────────────────────
+# Configuration IA (singleton)
+# ──────────────────────────────────────────────
+
+class AIConfig(Base):
+    """
+    Configuration de l'IA (singleton — une seule ligne, id=1).
+    Stockée en DB pour permettre la configuration depuis l'interface admin.
+    Les prompts restent dans le code.
+    """
+    __tablename__ = "ai_config"
+
+    id         = Column(Integer, primary_key=True, default=1)
+    provider   = Column(String(50),  nullable=False, default="gemini")
+    api_key    = Column(String(500), nullable=True)    # masquée dans l'UI
+    model_name = Column(String(100), nullable=False, default="gemini-1.5-flash")
+    is_active  = Column(Boolean,     nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -78,6 +78,19 @@
 
 </div>
 
+{% if show_import_banner %}
+<div class="alert alert-primary d-flex align-items-center gap-3 mb-4 shadow-sm" role="alert">
+  <i class="bi bi-stars fs-4 flex-shrink-0"></i>
+  <div class="flex-grow-1">
+    <strong>Votre profil est vide.</strong>
+    Gagnez du temps en important votre CV existant — Gemini extrait automatiquement toutes vos informations.
+  </div>
+  <a href="/ai/" class="btn btn-primary btn-sm flex-shrink-0">
+    <i class="bi bi-cloud-upload"></i> Importer mon CV
+  </a>
+</div>
+{% endif %}
+
 <!-- ====================================================
      Resume du CV
 ===================================================== -->
