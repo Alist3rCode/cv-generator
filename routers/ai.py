@@ -280,9 +280,8 @@ def import_cv_save(
         entreprise = (exp.get("entreprise") or "").strip()
         if not titre or not entreprise:
             continue
-        d_debut = _parse_date(exp.get("date_debut"))
-        if not d_debut:
-            continue
+        # date_debut obligatoire en base — fallback au 01/01 de l'année courante si absent
+        d_debut = _parse_date(exp.get("date_debut")) or date(date.today().year, 1, 1)
         db.add(Experience(
             id=uuid.uuid4(), gid=uuid.uuid4(), user_id=uid, language_id=lang_uuid,
             titre_poste=titre, entreprise=entreprise,
@@ -299,9 +298,8 @@ def import_cv_save(
         etab    = (form.get("etablissement") or "").strip()
         if not diplome or not etab:
             continue
-        d_debut = _parse_date(form.get("date_debut"))
-        if not d_debut:
-            continue
+        # date_debut obligatoire en base — fallback au 01/01 de l'année courante si absent
+        d_debut = _parse_date(form.get("date_debut")) or date(date.today().year, 1, 1)
         db.add(Formation(
             id=uuid.uuid4(), gid=uuid.uuid4(), user_id=uid, language_id=lang_uuid,
             diplome=diplome, etablissement=etab,
