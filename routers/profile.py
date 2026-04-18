@@ -137,6 +137,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
         "cloud_words":    cloud_words,
         "langue_count":   langue_count,
         "show_import_banner": not has_data,
+        "languages":      languages,
     })
 
 

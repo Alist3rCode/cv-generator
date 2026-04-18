@@ -914,6 +914,15 @@ main.container {
 .card-sm .card-header { font-size: .82rem; padding: .35rem .75rem; }
 .card-sm .card-body   { padding: .5rem .75rem; }
 
+/* ── Sélecteur de langue avec drapeaux (modale import rapide) ──────── */
+.quick-lang-btn { transition: all .15s; }
+.quick-lang-btn.active {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: #fff;
+}
+.quick-lang-btn img { border-radius: 2px; }
+
 /* ── Icône "valeur existante en DB" dans la modale de révision ──────── */
 @keyframes blink-icon {
   0%, 100% { opacity: 1; }

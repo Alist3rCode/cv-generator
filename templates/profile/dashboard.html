@@ -85,10 +85,166 @@
     <strong>Votre profil est vide.</strong>
     Gagnez du temps en important votre CV existant — Gemini extrait automatiquement toutes vos informations.
   </div>
-  <a href="/ai/" class="btn btn-primary btn-sm flex-shrink-0">
+  <button type="button" class="btn btn-primary btn-sm flex-shrink-0"
+          data-bs-toggle="modal" data-bs-target="#quickImportModal">
     <i class="bi bi-cloud-upload"></i> Importer mon CV
-  </a>
+  </button>
 </div>
+{% endif %}
+
+<!-- ── Modale d'import rapide (depuis le dashboard) ──────────────────── -->
+{% if languages %}
+<div class="modal fade" id="quickImportModal" tabindex="-1" aria-labelledby="quickImportTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="quickImportTitle">
+          <i class="bi bi-stars text-primary me-2"></i>Importer mon CV
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Langue du formulaire <span class="text-danger">*</span></label>
+          <div class="d-flex flex-wrap gap-2" id="quickLangPicker">
+            {% for lang in languages %}
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 quick-lang-btn {% if loop.first %}active{% endif %}"
+                    data-lang-id="{{ lang.id }}" data-lang-nom="{{ lang.nom }}">
+              <img src="https://flagcdn.com/20x15/{{ lang.code }}.png"
+                   width="20" height="15" alt="{{ lang.nom }}"
+                   onerror="this.style.display='none'" />
+              {{ lang.nom }}
+            </button>
+            {% endfor %}
+          </div>
+          <input type="hidden" id="quickLangId" value="{{ languages[0].id if languages else '' }}" />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Fichier CV <span class="text-danger">*</span></label>
+          <input type="file" class="form-control" id="quickImportFile" accept=".pdf,.docx" />
+          <div class="form-text">Formats acceptés : PDF, DOCX</div>
+        </div>
+
+        <div id="quickImportError" class="alert mb-0" style="display:none;"></div>
+
+        <div id="quickImportProgress" style="display:none;">
+          <div class="progress mb-2" style="height:6px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
+          </div>
+          <small class="text-muted" id="quickImportStep">Envoi vers Gemini…</small>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="btnQuickImport">
+          <i class="bi bi-stars"></i> Analyser avec Gemini
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ── Sélecteur de langue ── */
+  var langBtns = document.querySelectorAll('.quick-lang-btn');
+  var langInput = document.getElementById('quickLangId');
+
+  langBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      langBtns.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      langInput.value = btn.dataset.langId;
+    });
+  });
+
+  /* ── Soumission ── */
+  var btnSubmit  = document.getElementById('btnQuickImport');
+  var fileInput  = document.getElementById('quickImportFile');
+  var errDiv     = document.getElementById('quickImportError');
+  var progDiv    = document.getElementById('quickImportProgress');
+  var stepLbl    = document.getElementById('quickImportStep');
+  var STEPS      = ['Envoi du fichier vers Gemini…', 'Analyse IA du CV en cours…', 'Extraction des données structurées…'];
+  var _stepTimer = null, _stepIdx = 0;
+
+  function startSteps() {
+    progDiv.style.display = '';
+    _stepIdx = 0;
+    stepLbl.textContent = STEPS[0];
+    _stepTimer = setInterval(function () {
+      _stepIdx = Math.min(_stepIdx + 1, STEPS.length - 1);
+      stepLbl.textContent = STEPS[_stepIdx];
+    }, 3000);
+  }
+  function stopSteps() {
+    clearInterval(_stepTimer);
+    progDiv.style.display = 'none';
+  }
+
+  btnSubmit.addEventListener('click', function () {
+    var langId = langInput.value;
+    var file   = fileInput.files[0];
+
+    errDiv.style.display = 'none';
+    errDiv.className = 'alert mb-0';
+
+    if (!file) {
+      errDiv.className = 'alert alert-warning mb-0';
+      errDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Veuillez sélectionner un fichier PDF ou DOCX.';
+      errDiv.style.display = '';
+      return;
+    }
+
+    btnSubmit.disabled = true;
+    startSteps();
+
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('language_id', langId);
+
+    fetch('/ai/import/preview', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'fetch' },
+      body: fd,
+    })
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (res) {
+      stopSteps();
+      btnSubmit.disabled = false;
+
+      if (res.status !== 200) {
+        var msg = (res.data && res.data.error) ? res.data.error : 'Erreur lors de l\'analyse.';
+        errDiv.className = res.data && res.data.rate_limited
+          ? 'alert alert-warning mb-0'
+          : 'alert alert-danger mb-0';
+        errDiv.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + msg;
+        errDiv.style.display = '';
+        return;
+      }
+
+      /* Stocker le résultat dans sessionStorage puis rediriger vers /ai/ */
+      sessionStorage.setItem('ai_import_pending', JSON.stringify({
+        data:        res.data.data,
+        language_id: res.data.language_id,
+        existing:    res.data.existing || {},
+        has_existing: res.data.has_existing || false,
+      }));
+      window.location.href = '/ai/';
+    })
+    .catch(function (err) {
+      stopSteps();
+      btnSubmit.disabled = false;
+      errDiv.className = 'alert alert-danger mb-0';
+      errDiv.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Erreur réseau : ' + err.message;
+      errDiv.style.display = '';
+    });
+  });
+})();
+</script>
 {% endif %}
 
 <!-- ====================================================

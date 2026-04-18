@@ -855,6 +855,40 @@
     });
   }
 
+  /* ─── Import rapide depuis le dashboard (sessionStorage) ─────────── */
+  (function () {
+    var pending = sessionStorage.getItem('ai_import_pending');
+    if (!pending) return;
+    try {
+      var p = JSON.parse(pending);
+      sessionStorage.removeItem('ai_import_pending');
+
+      function openReview() {
+        buildReviewModal(p.data, 'import', p.language_id, p.existing || {});
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal')).show();
+      }
+
+      if (p.has_existing) {
+        var warnModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('overwriteWarningModal'));
+        var btnConfirm = document.getElementById('btnConfirmOverwrite');
+        var newBtn = btnConfirm.cloneNode(true);
+        btnConfirm.parentNode.replaceChild(newBtn, btnConfirm);
+        newBtn.addEventListener('click', function () {
+          warnModal.hide();
+          document.getElementById('overwriteWarningModal').addEventListener('hidden.bs.modal', function handler() {
+            document.getElementById('overwriteWarningModal').removeEventListener('hidden.bs.modal', handler);
+            openReview();
+          });
+        });
+        warnModal.show();
+      } else {
+        openReview();
+      }
+    } catch (e) {
+      sessionStorage.removeItem('ai_import_pending');
+    }
+  })();
+
   /* ─── Traduction ──────────────────────────────────────────────────── */
   var btnTranslate  = document.getElementById('btnTranslate');
   var translateErr  = document.getElementById('translateError');
