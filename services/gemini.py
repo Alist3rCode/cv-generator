@@ -99,8 +99,11 @@ Retourne UNIQUEMENT un objet JSON valide (sans markdown, sans backticks) avec ce
 
 Règles importantes :
 - Niveaux CEFR pour profil_langues : A1, A2, B1, B2, C1, C2, NATIVE
-- Dates : format YYYY-MM-DD. Si seul le mois/année est indiqué, utilise le 1er du mois.
-- Si une expérience est en cours : date_fin = null
+- Dates : toujours au format YYYY-MM-DD strict.
+  * Si seul le mois et l'année sont indiqués (ex: "06/2021"), utilise le 1er du mois : "2021-06-01".
+  * Si seule l'année est indiquée (ex: "2019"), utilise le 1er janvier : "2019-01-01".
+  * date_debut est OBLIGATOIRE pour chaque expérience et chaque formation. Si le CV ne mentionne aucune date de début, estime-la à partir du contexte (date_fin - durée approximative) ou utilise "2000-01-01" en dernier recours. Ne laisse jamais date_debut à null pour une expérience ou une formation.
+  * date_fin = null uniquement si l'expérience ou le poste est en cours.
 - Si une information n'est pas disponible : utilise null ou [] selon le type
 - Retourne UNIQUEMENT du JSON valide, aucun texte avant ou après
 """

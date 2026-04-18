@@ -83,7 +83,7 @@
   <i class="bi bi-stars fs-4 flex-shrink-0"></i>
   <div class="flex-grow-1">
     <strong>Votre profil est vide.</strong>
-    Gagnez du temps en important votre CV existant — Gemini extrait automatiquement toutes vos informations.
+    Gagnez du temps en important votre CV existant — l'IA extrait automatiquement toutes vos informations.
   </div>
   <button type="button" class="btn btn-primary btn-sm flex-shrink-0"
           data-bs-toggle="modal" data-bs-target="#quickImportModal">
@@ -134,14 +134,14 @@
           <div class="progress mb-2" style="height:6px;">
             <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
           </div>
-          <small class="text-muted" id="quickImportStep">Envoi vers Gemini…</small>
+          <small class="text-muted" id="quickImportStep">Envoi vers l'IA…</small>
         </div>
 
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
         <button type="button" class="btn btn-primary" id="btnQuickImport">
-          <i class="bi bi-stars"></i> Analyser avec Gemini
+          <i class="bi bi-stars"></i> Analyser avec l'IA
         </button>
       </div>
     </div>
@@ -168,7 +168,7 @@
   var errDiv     = document.getElementById('quickImportError');
   var progDiv    = document.getElementById('quickImportProgress');
   var stepLbl    = document.getElementById('quickImportStep');
-  var STEPS      = ['Envoi du fichier vers Gemini…', 'Analyse IA du CV en cours…', 'Extraction des données structurées…'];
+  var STEPS      = ['Envoi du fichier vers l\'IA…', 'Analyse du CV en cours…', 'Extraction des données structurées…'];
   var _stepTimer = null, _stepIdx = 0;
 
   function startSteps() {

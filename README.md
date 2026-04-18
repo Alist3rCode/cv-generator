@@ -28,8 +28,8 @@ docker compose up -d
 - **Auto-save par champ** — Chaque champ a ses propres boutons disquette / reset indépendants ; sauvegarder un champ ne touche pas les autres
 - **Duplication de traduction** — Depuis la liste, clic sur une langue non traduite pré-remplit le formulaire depuis une traduction existante ; une bannière globale invite à confirmer l'ensemble avant enregistrement
 - **Gestion des traductions** — Pills colorées dans les listes (vert = traduit, grisé = manquant) ; bouton `+` pour créer une traduction, bouton `−` pour en supprimer une (modale de confirmation irréversible)
-- **Fonctions IA (Gemini)** — Import de CV PDF/DOCX avec extraction automatique de toutes les données via Google Gemini ; traduction complète du profil vers une langue cible ; formulaire de révision interactif avec boutons 💾/↺ par champ ; avertissement si des données existent déjà, icônes info clignotantes affichant la valeur actuelle en base au survol
-- **Configuration IA (admin)** — Clé API, modèle Gemini et activation/désactivation depuis l'interface d'administration ; les prompts restent dans le code
+- **Fonctions IA** — Import de CV PDF/DOCX avec extraction automatique de toutes les données ; traduction complète du profil vers une langue cible ; formulaire de révision interactif avec boutons 💾/↺ par champ ; avertissement si des données existent déjà, icônes info clignotantes affichant la valeur actuelle en base au survol
+- **Configuration IA (admin)** — Clé API, modèle et activation/désactivation depuis l'interface d'administration ; les prompts restent dans le code
 - **Pages d'erreur** — Pages 404 / 500 personnalisées intégrées au thème
 - **Sidebar** — Navigation latérale repliable, état mémorisé dans `localStorage`
 - **Thème clair / sombre** — Détecte automatiquement la préférence système, toggle dans la sidebar
@@ -61,10 +61,12 @@ En local sous Windows, LibreOffice doit être installé sur la machine. Le chemi
 
 ## Fonctions IA
 
-Les fonctions IA utilisent l'API **Google Gemini** pour :
+Les fonctions IA permettent :
 
 - **Importer un CV** (PDF ou DOCX) → extraction automatique de toutes les données (expériences, formations, certifications, compétences, langues, bio, profil)
 - **Traduire le profil** vers une langue cible → traduction des rubriques sélectionnées en conservant les noms propres d'entreprises
+
+Le fournisseur IA actuel est **Google Gemini** (configurable depuis l'administration).
 
 ### Configuration
 
@@ -81,7 +83,7 @@ Obtenez une clé gratuite sur [Google AI Studio](https://aistudio.google.com/app
 
 ### Gestion des erreurs de quota (429)
 
-Si le quota Gemini est dépassé, un message clair s'affiche avec un compte à rebours automatique indiquant quand réessayer.
+Si le quota est dépassé, un message clair s'affiche avec un compte à rebours automatique indiquant quand réessayer.
 
 ## Installation
 

@@ -31,7 +31,7 @@
       </div>
       <div class="card-body">
         <p class="text-muted small mb-3">
-          Uploadez un fichier PDF ou DOCX — Gemini extrait automatiquement toutes vos informations
+          Uploadez un fichier PDF ou DOCX — l'IA extrait automatiquement toutes vos informations
           (expériences, formations, compétences…) et les place dans un formulaire de révision.
         </p>
 
@@ -64,7 +64,7 @@
 
         <button type="button" class="btn btn-primary w-100" id="btnImport"
                 {% if not ai_enabled %}disabled{% endif %}>
-          <i class="bi bi-stars"></i> Analyser avec Gemini
+          <i class="bi bi-stars"></i> Analyser avec l'IA
         </button>
       </div>
     </div>
@@ -81,7 +81,7 @@
       <div class="card-body">
         <p class="text-muted small mb-3">
           Sélectionnez les rubriques à traduire, la langue source et la langue cible.
-          Gemini traduit le contenu en conservant les noms propres d'entreprises.
+          L'IA traduit le contenu en conservant les noms propres d'entreprises.
         </p>
 
         <label class="form-label fw-semibold">Rubriques à traduire</label>
@@ -136,7 +136,7 @@
 
         <button type="button" class="btn btn-success w-100" id="btnTranslate"
                 {% if not ai_enabled %}disabled{% endif %}>
-          <i class="bi bi-stars"></i> Traduire avec Gemini
+          <i class="bi bi-stars"></i> Traduire avec l'IA
         </button>
       </div>
     </div>
@@ -243,7 +243,7 @@
 
   /* ─── Étapes de progression ───────────────────────────────────────── */
   var IMPORT_STEPS = [
-    { delay: 0,    text: 'Envoi du fichier vers Gemini…' },
+    { delay: 0,    text: 'Envoi du fichier vers l\'IA…' },
     { delay: 2000, text: 'Analyse IA du CV en cours…' },
     { delay: 6000, text: 'Extraction des données structurées…' },
   ];
@@ -310,7 +310,7 @@
         _startCountdown(el, resp.retry_after, msg);
         return;
       }
-      el.innerHTML = '<i class="bi bi-clock-history me-2"></i><strong>Quota Gemini dépassé.</strong> ' + esc(msg) + retryMsg;
+      el.innerHTML = '<i class="bi bi-clock-history me-2"></i><strong>Quota IA dépassé.</strong> ' + esc(msg) + retryMsg;
     } else {
       el.className = 'alert alert-danger mb-3';
       el.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + esc(msg);
@@ -321,7 +321,7 @@
     var remaining = parseInt(seconds, 10);
     function tick() {
       el.innerHTML = '<i class="bi bi-clock-history me-2"></i>'
-        + '<strong>Quota Gemini dépassé.</strong> '
+        + '<strong>Quota IA dépassé.</strong> '
         + esc(baseMsg.replace(/\.\s*$/, '')) + '.'
         + ' Réessayez dans <strong>' + remaining + ' secondes</strong>.';
       if (remaining > 0) {
