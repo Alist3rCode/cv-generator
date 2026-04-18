@@ -266,7 +266,8 @@ Un template de base prêt à l'emploi est téléchargeable depuis la page **Temp
 | Fonctionnalité | Description |
 |---|---|
 | Connexion LDAP | Authentification via un annuaire LDAP/Active Directory d'entreprise |
-| Connexion SSO | Support OAuth2 / SAML pour une connexion unique (SSO) |
+| Connexion SSO | Support OAuth2 / OIDC pour une connexion unique (SSO) |
+| Connexion SAML 2.0 | Authentification fédérée via SAML 2.0 (Okta, Azure AD / Microsoft Entra ID, ADFS…) |
 | Gestion de hiérarchie | Structuration en équipes / managers avec droits et visibilités associés |
 | IA multi-fournisseurs | Prise en charge d'IA maison (self-hosted) et des principaux fournisseurs du marché : OpenAI, Claude (Anthropic), Mistral, Copilot |
 
